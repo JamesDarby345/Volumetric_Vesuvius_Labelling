@@ -1,5 +1,5 @@
 pynrrd
-napari
+'napari[all]'
 numpy
 zarr
 blosc2
@@ -7,3 +7,4 @@ scikit-image
 scipy
 matplotlib
 jupyter
+ipykernel
