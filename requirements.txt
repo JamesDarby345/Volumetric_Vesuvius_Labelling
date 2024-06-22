@@ -1,0 +1,9 @@
+pynrrd
+napari
+numpy
+zarr
+blosc2
+scikit-image
+scipy
+matplotlib
+jupyter
