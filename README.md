@@ -29,7 +29,7 @@ Change path variables to point to your raw data cube and semantic mask cube (com
 
 Search for Change to find path location variables to change to point to raw and mask data files (zarr and nrrd raw files supported, nrrd and jordi's blosc2 gross volumetric labels supported)
 
-Optionally search for 'keybind' in the notebook to change the keys certain custom functions are mapped to.
+Optionally search for 'keybind' in the notebook to change the keys certain custom functions are mapped to. Note that keys like x,y,z,[,],-,= have default Napari mappings and may not work in all modes.
 
 ## Custom Napari Keybinds:<br>
 v to toggle compressed region class brush<br>
