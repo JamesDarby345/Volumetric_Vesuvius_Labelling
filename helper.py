@@ -152,10 +152,10 @@ def limited_bfs_flood_fill(data, start_coords, max_distance):
 
     return filled
 
-def label_foreground_structures_napari(input_array, min_size=1000, border_class=254):
+def label_foreground_structures_napari(input_array, min_size=1000, compressed_class=254):
     # Find connected components in the foreground (value 2)
     foreground = input_array > 0
-    foreground[foreground == border_class] = 0
+    foreground[foreground == compressed_class] = 0
 
     # Label connected components
     labeled_array, num_features = scipy.ndimage.label(foreground)
@@ -176,14 +176,14 @@ def label_foreground_structures_napari(input_array, min_size=1000, border_class=
     print(f"Number of connected foreground structures before filtering: {num_features}")
     print(f"Number of connected foreground structures after filtering: {np.max(labeled_array)}")
     
-    labeled_array[input_array == border_class] = border_class # Add the border class back in
+    labeled_array[input_array == compressed_class] = compressed_class # Add the border class back in
 
     return labeled_array
 
-def interpolate_slices(raw_data, border_class=254):
+def interpolate_slices(raw_data, compressed_class=254):
     # Find the indices of slices that have annotations
     data = raw_data.copy()
-    data[data != border_class] = 0
+    data[data != compressed_class] = 0
     print(np.sum(data))
     annotated_slices = np.any(data, axis=(1, 2))
     annotated_indices = np.where(annotated_slices)[0]
@@ -215,26 +215,26 @@ def interpolate_slices(raw_data, border_class=254):
                         
     # structure = np.ones((3, 3, 3))  # Define the structure for closing
     # interpolated_data = binary_closing(interpolated_data, structure=structure).astype(interpolated_data.dtype)
-    interpolated_data[interpolated_data != 0] = border_class
+    interpolated_data[interpolated_data != 0] = compressed_class
     return interpolated_data
 
 def bright_spot_mask(data):
     # Calculate the threshold for the top 0.1% brightest voxels
-    threshold = np.percentile(data, 99.9)
+    threshold = np.percentile(data, 99.5)
 
     # Create a mask for the top 1% brightest voxels
     bright_spot_mask = (data > threshold)
 
     # Apply small object removal (you can adjust the minimum size as needed)
-    min_size = 5  # Minimum size of objects to keep
+    min_size = 100  # Minimum size of objects to keep
     bright_spot_mask = remove_small_objects(bright_spot_mask, min_size=min_size)
 
     # Apply small hole removal (you can adjust the area threshold as needed)
-    area_threshold = 5  # Maximum area of holes to fill
-    bright_spot_mask = remove_small_holes(bright_spot_mask, area_threshold=area_threshold)
+    # area_threshold = 20  # Maximum area of holes to fill
+    # bright_spot_mask = remove_small_holes(bright_spot_mask, area_threshold=area_threshold)
     # Dilate the bright spot mask by one
 
-    bright_spot_mask = binary_dilation(bright_spot_mask, iterations=2)
+    bright_spot_mask = binary_dilation(bright_spot_mask, iterations=1)
     return bright_spot_mask
 
 
