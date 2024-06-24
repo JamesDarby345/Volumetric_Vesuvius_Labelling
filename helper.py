@@ -8,9 +8,87 @@ import scipy.ndimage
 from matplotlib import pyplot as plt
 from scipy.ndimage import binary_dilation
 from scipy.interpolate import interp1d
+import os
+import nrrd
 
 #helper functions for napari ui
 from collections import deque
+
+def get_padded_nrrd_data(folder_path, original_coords, pad_amount, chunk_size=256):
+    z, y, x = original_coords
+    padded_raw_data = None
+    missing_cubes = []
+    
+    # Define the relative coordinates of neighboring chunks
+    neighbors = [
+        (-1, -1, -1), (-1, -1, 0), (-1, -1, 1),
+        (-1, 0, -1),  (-1, 0, 0),  (-1, 0, 1),
+        (-1, 1, -1),  (-1, 1, 0),  (-1, 1, 1),
+        (0, -1, -1),  (0, -1, 0),  (0, -1, 1),
+        (0, 0, -1),   (0, 0, 0),   (0, 0, 1),
+        (0, 1, -1),   (0, 1, 0),   (0, 1, 1),
+        (1, -1, -1),  (1, -1, 0),  (1, -1, 1),
+        (1, 0, -1),   (1, 0, 0),   (1, 0, 1),
+        (1, 1, -1),   (1, 1, 0),   (1, 1, 1)
+    ]
+    
+    padded_size = chunk_size + 2 * pad_amount
+    padded_raw_data = np.zeros((padded_size, padded_size, padded_size))
+    
+    for dz, dy, dx in neighbors:
+        neighbor_z = z + dz * chunk_size
+        neighbor_y = y + dy * chunk_size
+        neighbor_x = x + dx * chunk_size
+        
+        filename = f"volume_{neighbor_z}_{neighbor_y}_{neighbor_x}.nrrd"
+        filepath = os.path.join(folder_path, filename)
+        
+        if os.path.exists(filepath):
+            data, _ = nrrd.read(filepath)
+            
+            # Determine the slices to extract from this cube
+            z_start = chunk_size - pad_amount if dz < 0 else 0
+            z_end = pad_amount if dz > 0 else chunk_size
+            y_start = chunk_size - pad_amount if dy < 0 else 0
+            y_end = pad_amount if dy > 0 else chunk_size
+            x_start = chunk_size - pad_amount if dx < 0 else 0
+            x_end = pad_amount if dx > 0 else chunk_size
+
+            # print(dz, dy, dx)
+            # print(f"Extracting data from {filename} at zyx {z_start}:{z_end}, {y_start}:{y_end}, {x_start}:{x_end}")
+            
+            # Extract the relevant portion of the data
+            extracted_data = data[z_start:z_end, y_start:y_end, x_start:x_end]
+            
+            # Determine where to place the extracted data in padded_raw_data
+            z_pad_start = pad_amount + (dz) * pad_amount
+            if dz == 1:
+                z_pad_start = pad_amount + chunk_size
+            y_pad_start = pad_amount + (dy) * pad_amount
+            if dy == 1:
+                y_pad_start = pad_amount + chunk_size
+            x_pad_start = pad_amount + (dx) * pad_amount
+            if dx == 1:
+                x_pad_start = pad_amount + chunk_size
+            
+            z_pad_end = z_pad_start + extracted_data.shape[0]
+            y_pad_end = y_pad_start + extracted_data.shape[1]
+            x_pad_end = x_pad_start + extracted_data.shape[2]
+            
+            # print(f"Placing data in padded_raw_data at zyx {z_pad_start}:{z_pad_end}, {y_pad_start}:{y_pad_end}, {x_pad_start}:{x_pad_end}")
+
+
+            # Place the extracted data in padded_raw_data
+            padded_raw_data[z_pad_start:z_pad_end, y_pad_start:y_pad_end, x_pad_start:x_pad_end] = extracted_data
+        else:
+            missing_cubes.append((neighbor_z, neighbor_y, neighbor_x))
+    
+    if len(missing_cubes) > 0:
+        print("List of missing neighbor cubes:")
+        for cube in missing_cubes:
+            print(f"volume_{cube[0]}_{cube[1]}_{cube[2]}.nrrd")
+    
+    return padded_raw_data
 
 def limited_bfs_flood_fill(data, start_coords, max_distance):
     shape = data.shape
