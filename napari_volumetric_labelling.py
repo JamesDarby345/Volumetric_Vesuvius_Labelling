@@ -8,6 +8,7 @@ from helper import *
 from napari.layers import Image
 from scipy.ndimage import binary_dilation, binary_erosion, binary_closing
 from qtpy.QtWidgets import QMessageBox
+from qtpy.QtCore import QTimer
 
 # Data location and size parameters
 scroll_name = 's1'
@@ -83,8 +84,8 @@ if False:
 # e to increase brush size<br>
 # w to select label layer that was last clicked in move mode, alternatively use color picker (4)<br>
 # s to toggle show selected label<br>
-# a to decrease selected label value<br>
-# d to increase selected label value<br>
+# a to move through layers in 2d<br>
+# d to move through layers in 2d<br>
 # x to extrapolate sparse compressed class labels<br>
 
 # Initialize the Napari viewer
@@ -106,7 +107,7 @@ image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
 labels_layer = viewer.add_labels(label_data, name=label_name)
 
 #load saved labels and compressed labels if they exist
-file_path = 'output/volumetric_labels/'
+file_path = f'output/volumetric_labels_{scroll_name}/'
 label_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
 if os.path.exists(label_path):
     label_data, _ = nrrd.read(label_path)
@@ -186,22 +187,6 @@ def toggle_show_selected_label(viewer):
     labels_layer.show_selected_label = not labels_layer.show_selected_label
     if label_3d_name in viewer.layers:
         viewer.layers[label_3d_name].show_selected_label = not viewer.layers[label_3d_name].show_selected_label
-
-#keybind a to cycle through the selected label
-@viewer.bind_key('a')
-def decrease_selected_label(viewer):
-    msg = 'decrease selected label'
-    viewer.status = msg
-    print(msg)
-    labels_layer.selected_label = labels_layer.selected_label - 1
-
-#keybind d to cycle through the selected label
-@viewer.bind_key('d')
-def increase_selected_label(viewer):
-    msg = 'increase selected label'
-    viewer.status = msg
-    print(msg)
-    labels_layer.selected_label = labels_layer.selected_label + 1
 
 # Function to capture cursor information when 'w' is pressed
 def capture_cursor_info(event):
@@ -490,6 +475,44 @@ def on_right_arrow_event(viewer):
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
+# Define the functions to move left and right
+def move_left(viewer):
+    viewer.window._qt_viewer.viewer.dims._increment_dims_left()
+
+def move_right(viewer):
+    viewer.window._qt_viewer.viewer.dims._increment_dims_right()
+
+# Create timers for holding keys
+left_timer = QTimer()
+right_timer = QTimer()
+
+# Connect the timers to the move functions
+left_timer.timeout.connect(lambda: move_left(viewer))
+right_timer.timeout.connect(lambda: move_right(viewer))
+
+# Define the key press events
+@viewer.bind_key('a', overwrite=True)
+def start_left_timer(viewer):
+    move_left(viewer)  # Move immediately on key press
+    if not left_timer.isActive():
+        left_timer.start(100)  # Adjust the interval as needed
+
+@viewer.bind_key('d', overwrite=True)
+def start_right_timer(viewer):
+    move_right(viewer)  # Move immediately on key press
+    if not right_timer.isActive():
+        right_timer.start(100)  # Adjust the interval as needed
+
+# Function to stop timers when keys are released
+def stop_timers(event):
+    if event.key == 'a' and left_timer.isActive():
+        left_timer.stop()
+    elif event.key == 'd' and right_timer.isActive():
+        right_timer.stop()
+
+# Connect the key release event to the function
+viewer.window._qt_viewer.canvas.events.key_release.connect(stop_timers)
+
 #keybind ' to switch to eraser on the 3d label layer
 @viewer.bind_key('\'')
 def erase_3d_mode(viewer):
@@ -696,7 +719,7 @@ def save_labels(viewer):
     viewer.status = msg
     print(msg)
     current_directory = os.getcwd()
-    file_path = f'output/volumetric_labels/'
+    file_path = f'output/volumetric_labels_{scroll_name}/'
     output_path = os.path.join(current_directory, file_path)
     if not os.path.exists(output_path):
         os.makedirs(output_path)

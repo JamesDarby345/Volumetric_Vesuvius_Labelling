@@ -56,8 +56,8 @@ q to decrease brush size<br>
 e to increase brush size<br>
 w to select label layer that was last clicked in move mode, alternatively use color picker (4)<br>
 s to toggle show selected label<br>
-a to decrease selected label value<br>
-d to increase selected label value<br>
+a to move through layers in 2d<br>
+d to move through layers in 2d<br>
 x to extrapolate sparse compressed class labels<br>
 
 Please contact me with a github issue or @james darby on the Vesuvius challenge discord server if you have a feature request or pain point description that would help volumetrically label data faster or more accurately. 
