@@ -12,7 +12,7 @@ To provide custom tooling and extensions to the Napari 3d viewer that will help 
 -Compressed/Mush class<br>
 -Editable Hotkeys specific to the target task for switching between modes, tools and views to increase speed & fluidity of work<br>
 
-TODO (create this video): Watch the tutorial video on how to use available here: 
+Watch the tutorial video on how to use available here: https://dl.ash2txt.org/community-uploads/james/Napari_Volumetric_Cube_Labelling_Tutorial.mp4 <br>
 
 ![Screenshot 2024-06-24 at 7 13 04 PM](https://github.com/JamesDarby345/Volumetric_Vesuvius_Labelling/assets/49734270/23372150-e319-414d-b6bf-63a2c5b85ee6)
 
@@ -42,6 +42,8 @@ l to switch active layer to data layer (useful to move 3d plane with shift click
 ' to switch to erase mode<br>
 ; to switch to pan & zoom mode<br>
 , to toggle 3d plane precision erase mode<br>
+o to create off-axis plane cut in 3d mode (can also hold down to adjust)<br>
+shift + click to move the 3d volume plane quickly<br>
 
 i to erode labels 1 iteration<br>
 u to dilate labels 1 iteration<br>
@@ -59,6 +61,8 @@ s to toggle show selected label<br>
 a to move through layers in 2d<br>
 d to move through layers in 2d<br>
 x to extrapolate sparse compressed class labels<br>
+
+Note that moving the 3d plane with the arrows keys with the label visible (without hiding with /) can be laggy if moving more than one or two slices, use shift + click with the data layer selected (hotkey of l to select the data layer) or hide the label with / for better performance.
 
 Please contact me with a github issue or @james darby on the Vesuvius challenge discord server if you have a feature request or pain point description that would help volumetrically label data faster or more accurately. 
 
