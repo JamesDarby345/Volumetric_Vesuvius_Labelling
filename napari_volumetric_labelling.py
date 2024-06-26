@@ -160,6 +160,10 @@ def toggle_data_visibility(viewer):
     viewer.status = msg
     print(msg)
     image_layer.visible = not image_layer.visible
+    if label_3d_name in viewer.layers and not image_layer.visible:
+        viewer.layers[label_3d_name].blending = 'minimum'
+    elif label_3d_name in viewer.layers and image_layer.visible:
+        viewer.layers[label_3d_name].blending = 'opaque'
 
 #keybind t alt to toggle the data layer visibility
 viewer.bind_key('t', toggle_data_visibility)
@@ -586,7 +590,9 @@ def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
         cut_side = not cut_side
     if viewer.dims.ndisplay == 3:
         cut_label_at_plane(viewer, erase_mode=False, cut_side=cut_side, prev_plane_info=prev_plane_info)
+        
         viewer.layers[label_3d_name].visible = True
+        viewer.layers[label_3d_name].blending = 'opaque'
         viewer.layers[label_3d_name].refresh()
         viewer.layers[label_name].visible = False
 
