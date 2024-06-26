@@ -341,7 +341,7 @@ def shift_plane(layer, direction, padding_mode=False, padding=50):
         print("Cannot shift: not in plane mode or 2D view")
 
 #keybind y to switch to full label 3d view
-@viewer.bind_key('y')
+@viewer.bind_key('b', overwrite=True)
 def full_label_view(viewer):
     if viewer.dims.ndisplay == 2:
         viewer.dims.ndisplay = 3
@@ -619,20 +619,22 @@ def connected_components(viewer):
         viewer.add_labels(new_borders, name=compressed_name)
 
     #apply any changes to the layer_3d_name layer to the labels layer
-    if prev_plane_info_var is not None:
-        cut_label_at_oblique_plane(viewer, switch=False, prev_plane_info=prev_plane_info_var)
-    else:
-        cut_label_at_oblique_plane(viewer, switch=False)
+    if label_3d_name in viewer.layers:
+        if prev_plane_info_var is not None:
+            cut_label_at_oblique_plane(viewer, switch=False, prev_plane_info=prev_plane_info_var)
+        else:
+            cut_label_at_oblique_plane(viewer, switch=False)
 
     #connected components data with both layer's borders removed
     cc_data = labels_layer.data.copy()
     cc_data[mask] = 0
 
     labels_layer.data = label_foreground_structures_napari(cc_data, compressed_class=compressed_class, min_size=1000)
-    if prev_plane_info_var is not None:
-        cut_label_at_oblique_plane(viewer, switch=False, prev_plane_info=prev_plane_info_var)
-    else:
-        cut_label_at_oblique_plane(viewer, switch=False)
+    if label_3d_name in viewer.layers:
+        if prev_plane_info_var is not None:
+            cut_label_at_oblique_plane(viewer, switch=False, prev_plane_info=prev_plane_info_var)
+        else:
+            cut_label_at_oblique_plane(viewer, switch=False)
     msg = 'connected components finished'
     viewer.status = msg
     print(msg)
