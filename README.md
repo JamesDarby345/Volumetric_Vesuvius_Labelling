@@ -1,18 +1,18 @@
 ## Purpose of the repo:
-To provide custom tooling and extensions to the Napari 3d viewer that will help create more and better manually annotated volumetric masks of the Vesuvius Scrolls Data. These labels can be used to train ML Networks to seperate sheets automatically, and make inroads to automatic segmentation, inclusing in dense or compressed regions
+To provide custom tooling and extensions to the Napari 3d viewer that will help create more and better manually annotated volumetric masks of the Vesuvius Scrolls Data. These labels can be used to train ML Networks to separate sheets automatically, and make inroads to automatic segmentation, including in dense or compressed regions.
 
 ## Features:
 -2D & 3D volumetric label editing<br>
 -Responsive 3D Erasing<br>
--Oblique, 3D off-axis cuts, especially useful in dense and confusing regions (most of scroll 2)<br>
--Limited range flood fill to quickly find connections in 2d, and to serve as a landmark in 3d.<br>
--One button extended cube context <br>
+-Oblique, 3D off-axis cuts, especially useful in dense and confusing regions (mostly in scroll 2)<br>
+-Limited range flood fill to quickly find connections in 2d, and to serve as a landmark in 3d<br>
+-Single button extended cube context<br>
 -Label erosion & dilation<br>
--Connected Components seperation<br>
+-Connected Components separation<br>
 -Compressed/Mush class<br>
 -Editable Hotkeys specific to the target task for switching between modes, tools and views to increase speed & fluidity of work<br>
 
-Watch the tutorial video on how to use available here: https://dl.ash2txt.org/community-uploads/james/Napari_Volumetric_Cube_Labelling_Tutorial.mp4 <br>
+Watch the tutorial video on how to use it: https://dl.ash2txt.org/community-uploads/james/Napari_Volumetric_Cube_Labelling_Tutorial.mp4 <br>
 
 ![Screenshot 2024-06-24 at 7 13 04 PM](https://github.com/JamesDarby345/Volumetric_Vesuvius_Labelling/assets/49734270/23372150-e319-414d-b6bf-63a2c5b85ee6)
 
@@ -63,9 +63,9 @@ a to move through layers in 2d<br>
 d to move through layers in 2d<br>
 x to extrapolate sparse compressed class labels<br>
 
-Note that moving the 3d plane with the arrows keys with the label visible (without hiding with /) can be laggy if moving more than one or two slices, use shift + click with the data layer selected (hotkey of l to select the data layer) or hide the label with / for better performance.
+Note that moving the 3d plane with the arrow keys while the label is visible (without hiding with /) can be laggy if moving more than one or two slices. Use shift + click with the data layer selected (hotkey of l to select the data layer) or hide the label with / for better performance.
 
-Please contact me with a github issue or @james darby on the Vesuvius challenge discord server if you have a feature request or pain point description that would help volumetrically label data faster or more accurately. 
+Please contact me with a github issue or @james darby on the Vesuvius challenge discord server if you have a feature request or pain point description that would help volumetrically label data faster or more accurately.
 
 ![Screenshot 2024-06-24 at 7 13 12 PM](https://github.com/JamesDarby345/Volumetric_Vesuvius_Labelling/assets/49734270/d50617ff-e159-4710-ada5-feb51852a334)
 ![Screenshot 2024-06-24 at 7 13 36 PM](https://github.com/JamesDarby345/Volumetric_Vesuvius_Labelling/assets/49734270/124f9d0b-090c-4e92-b009-ab8a2d083428)
