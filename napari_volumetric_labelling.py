@@ -53,7 +53,8 @@ if len(padded_raw_data) == 0:
     padded_raw_data = raw_data
 
 # removes bright spots from the data, brightest 0.5% of the data
-if False:
+bright_spot_masking = False
+if bright_spot_masking:
     bright_spot_mask_arr = bright_spot_mask(data)
     print(f'bright spot mask shape: {bright_spot_mask_arr.shape}')
     print(np.max(bright_spot_mask_arr  ))
@@ -111,7 +112,8 @@ file_path = f'output/volumetric_labels_{scroll_name}/'
 label_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
 if os.path.exists(label_path):
     label_data, _ = nrrd.read(label_path)
-    label_data = label_data * np.logical_not(bright_spot_mask(data))
+    if bright_spot_masking:
+        label_data = label_data * np.logical_not(bright_spot_mask(data))
     labels_layer.data = label_data
 
 padded_labels = np.pad(label_data, pad_width=pad_amount, mode='constant', constant_values=0)
