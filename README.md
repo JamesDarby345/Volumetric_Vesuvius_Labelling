@@ -24,8 +24,9 @@ conda activate napari_vesuvius
 pip install -r requirements.txt
 ```
 
-Attach the napari_vesuvius environment as the kernel to the napari_volumetric_labelling.ipynb jupyter notebook
-Change path variables to point to your raw data cube and semantic mask cube (commented code for zarrs and individual nrrds already exists in the notebook, though anything that loads in a numpy array can work and be assigned to the data and label variables)
+Change path variables to point to your raw data cube and semantic mask cube, or move them to a data/nrrd_cubes folder beside the scripts which is the default expected path. (Commented code for zarrs and individual nrrds already exists in the notebook, though anything that loads in a numpy array can work and be assigned to the data and label variables)
+
+Attach the napari_vesuvius environment as the kernel to the napari_volumetric_labelling.ipynb jupyter notebook or activate the conda environment and run the napari_volumetric_labelling.py file.
 
 Search for Change to find path location variables to change to point to raw and mask data files (zarr and nrrd raw files supported, nrrd and jordi's blosc2 gross volumetric labels supported)
 
