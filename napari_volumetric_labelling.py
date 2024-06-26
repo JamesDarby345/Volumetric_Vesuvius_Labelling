@@ -769,6 +769,8 @@ labels_layer.n_edit_dimensions = 3
 labels_layer.brush_size = 2
 labels_layer.opacity = 0.5
 labels_layer.contour = 1
+viewer.theme = 'light'
+viewer.window._qt_viewer.canvas.bgcolor = 'white'
 
 viewer.layers.selection.active = viewer.layers[label_name]
 
