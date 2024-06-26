@@ -340,6 +340,31 @@ def shift_plane(layer, direction, padding_mode=False, padding=50):
     else:
         print("Cannot shift: not in plane mode or 2D view")
 
+#keybind y to switch to full label 3d view
+@viewer.bind_key('y')
+def full_label_view(viewer):
+    if viewer.dims.ndisplay == 2:
+        viewer.dims.ndisplay = 3
+        for layer in viewer.layers:
+            if layer.name != label_name:
+                viewer.layers[layer.name].visible = False
+            else:
+                viewer.layers[layer.name].visible = True
+                viewer.layers[layer.name].blending = 'minimum'
+    else:
+        viewer.dims.ndisplay = 2
+        for layer in viewer.layers:
+            if layer.name != label_3d_name:
+                viewer.layers[layer.name].visible = True
+            else:
+                viewer.layers[layer.name].visible = False
+            if layer.name == label_name:
+                viewer.layers[layer.name].blending = 'translucent'
+        viewer.layers.selection.active = viewer.layers[label_name]
+        viewer.layers[label_name].contour = 1
+            
+
+
 #keybind \ to setup the 3d viewing mode conviniently with custom vesuvius layers
 @viewer.bind_key('\\')
 def switch_to_plane(viewer):
