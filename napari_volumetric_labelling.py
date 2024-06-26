@@ -392,11 +392,19 @@ def switch_to_plane(viewer):
         # print(f"Current step: {step_val}")
         viewer.dims.ndisplay = 3
     
-        # Hide all layers except the one named `data_name`
+        # Prep layers visibility and blending
         for layer in viewer.layers:
-            if layer.name != data_name and layer.name != ff_name:
-                viewer.layers[layer.name].visible = False
             
+            if layer.name != data_name and layer.name != ff_name and layer.name != label_name and layer.name != label_3d_name:
+                viewer.layers[layer.name].visible = False
+            elif layer.name == label_name:
+                if label_3d_name in viewer.layers:
+                    viewer.layers[label_3d_name].visible = True
+                    viewer.layers[label_3d_name].blending = 'opaque'
+                    viewer.layers[layer.name].visible = False
+                else:
+                    viewer.layers[layer.name].visible = True
+                    viewer.layers[layer.name].blending = 'opaque'
             elif layer.name == data_name:
                 # Change the depiction of `data_name` layer from volume to plane
                 viewer.layers[layer.name].visible = True
