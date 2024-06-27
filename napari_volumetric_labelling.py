@@ -9,6 +9,8 @@ from napari.layers import Image
 from scipy.ndimage import binary_dilation, binary_erosion, binary_closing
 from qtpy.QtWidgets import QMessageBox
 from qtpy.QtCore import QTimer
+from magicgui import magicgui
+from magicgui.widgets import Container
 
 # Data location and size parameters
 scroll_name = 's1'
@@ -346,7 +348,7 @@ def shift_plane(layer, direction, padding_mode=False, padding=50):
     else:
         print("Cannot shift: not in plane mode or 2D view")
 
-#keybind y to switch to full label 3d view
+#keybind b to switch to full label 3d view
 @viewer.bind_key('b', overwrite=True)
 def full_label_view(viewer):
     if viewer.dims.ndisplay == 2:
@@ -357,6 +359,7 @@ def full_label_view(viewer):
             else:
                 viewer.layers[layer.name].visible = True
                 viewer.layers[layer.name].blending = 'minimum'
+                
     else:
         viewer.dims.ndisplay = 2
         for layer in viewer.layers:
@@ -778,6 +781,42 @@ def save_labels(viewer):
         nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_compressed_regions.nrrd"), viewer.layers[compressed_name].data)
     msg = f"Layers saved to {output_path}"
     show_popup(msg)
+
+#UI buttons for learning the hotkey functions
+@magicgui(call_button="Dilate Labels")
+def dilate_labels_gui():
+    erode_dilate_labels(viewer.layers[label_name].data, erode=False)
+
+@magicgui(call_button="Erode Labels")
+def erode_labels_gui():
+    erode_dilate_labels(viewer.layers[label_name].data, erode=True)
+
+@magicgui(call_button="Toggle 3D full label view")
+def full_label_view_gui():
+    full_label_view(viewer)
+
+@magicgui(call_button="Toggle 3D plane cut view")
+def switch_to_plane_gui():
+    switch_to_plane(viewer)
+
+@magicgui(call_button="Toggle Padding on Data")
+def add_padding_contextual_data_gui():
+    add_padding_contextual_data(viewer)
+
+@magicgui(call_button="Cut Label at Plane")
+def cut_label_at_plane_gui():
+    cut_label_at_oblique_plane(viewer)
+
+@magicgui(call_button="Connected Components", auto_call=True)
+def connected_components_gui():
+    connected_components(viewer)
+
+@magicgui(call_button="Save Labels")
+def save_labels_gui():
+    save_labels(viewer)
+
+container = Container(widgets=[dilate_labels_gui, erode_labels_gui, full_label_view_gui, switch_to_plane_gui, add_padding_contextual_data_gui, cut_label_at_plane_gui, connected_components_gui, save_labels_gui])
+viewer.window.add_dock_widget(container, area='right')
 
 # Default napari settings for Vesuvius Volumetric Labeling
 viewer.axes.visible = True
