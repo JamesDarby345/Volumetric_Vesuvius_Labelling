@@ -16,6 +16,37 @@ from qtpy.QtWidgets import QMessageBox
 #helper functions for napari ui
 from collections import deque
 
+import numba
+
+@numba.jit(nopython=True, parallel=True)
+def numba_dilation_3d_labels(data, iterations):
+    result = data.copy()
+    rows, cols, depths = data.shape
+    
+    for _ in range(iterations):
+        temp = result.copy()
+        for i in numba.prange(rows):
+            for j in range(cols):
+                for k in range(depths):
+                    if result[i, j, k] == 0:  # Only dilate into empty space
+                        # Check 6-connected neighbors
+                        if i > 0 and temp[i-1, j, k] != 0:
+                            result[i, j, k] = temp[i-1, j, k]
+                        elif i < rows-1 and temp[i+1, j, k] != 0:
+                            result[i, j, k] = temp[i+1, j, k]
+                        elif j > 0 and temp[i, j-1, k] != 0:
+                            result[i, j, k] = temp[i, j-1, k]
+                        elif j < cols-1 and temp[i, j+1, k] != 0:
+                            result[i, j, k] = temp[i, j+1, k]
+                        elif k > 0 and temp[i, j, k-1] != 0:
+                            result[i, j, k] = temp[i, j, k-1]
+                        elif k < depths-1 and temp[i, j, k+1] != 0:
+                            result[i, j, k] = temp[i, j, k+1]
+                        
+    return result
+
+
+
 def show_popup(message):
     msg = QMessageBox()
     msg.setIcon(QMessageBox.Information)

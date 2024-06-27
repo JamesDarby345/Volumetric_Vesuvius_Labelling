@@ -11,6 +11,10 @@ from qtpy.QtWidgets import QMessageBox,QPushButton, QLabel, QHBoxLayout, QVBoxLa
 from qtpy.QtCore import QTimer, Qt
 from magicgui import magicgui
 from magicgui.widgets import Container
+# from concurrent.futures import ProcessPoolExecutor, as_completed
+# from napari.qt.threading import thread_worker
+from napari.qt.threading import thread_worker
+from napari.utils.notifications import show_info
 
 # Data location and size parameters
 scroll_name = 's1'
@@ -282,42 +286,107 @@ prev_plane_info_var = None
 previous_label_3d_data = None
 manual_changes_mask = None
 
-def erode_dilate_labels(data, erode=True, erosion_iterations=1, dilation_iterations=1):
-    unique_values = np.unique(data[(data > 0) & (data < 254)])  # Ignore background, masking, and values of 254 and higher
-    # Create an empty array for the result
+# def erode_dilate_labels(data, erode=True, erosion_iterations=1, dilation_iterations=1):
+#     unique_values = np.unique(data[(data > 0) & (data < 254)])  # Ignore background, masking, and values of 254 and higher
+#     # Create an empty array for the result
+#     result = np.zeros_like(data, dtype=np.uint8)
+    
+#     for value in unique_values:
+#         structure_mask = data == value
+#         if erode:
+            
+#             # Pad the structure mask to prevent erosion at the edges
+#             padded_structure = np.pad(structure_mask, pad_width=erosion_iterations, mode='constant', constant_values=value)
+            
+#             # Erode the padded structure
+#             eroded_padded_structure = binary_erosion(padded_structure, iterations=erosion_iterations)
+            
+#             # Remove the padding after erosion
+#             eroded_structure = eroded_padded_structure[
+#                 erosion_iterations:-erosion_iterations,
+#                 erosion_iterations:-erosion_iterations,
+#                 erosion_iterations:-erosion_iterations
+#             ]
+            
+#             # Ensure the eroded structure is within bounds
+#             if eroded_structure.shape != structure_mask.shape:
+#                 eroded_structure = np.zeros_like(structure_mask)
+#             result[eroded_structure] = value
+#         else:
+#             if dilation_iterations > 0:
+#                 # Dilate the original structure bounded by the original mask
+#                 dilation_mask = original_label_data != 0
+#                 dilated_structure = binary_dilation(structure_mask, iterations=dilation_iterations)
+#                 dilated_structure = dilated_structure & dilation_mask
+#             else:
+#                 dilated_structure = structure_mask
+#             result[dilated_structure] = value  
+#     return result
+
+def process_value(value, data, erode, erosion_iterations, dilation_iterations, original_label_data):
+    structure_mask = data == value
     result = np.zeros_like(data, dtype=np.uint8)
     
-    for value in unique_values:
-        structure_mask = data == value
-        if erode:
+    if erode:
+        padded_structure = np.pad(structure_mask, pad_width=erosion_iterations, mode='constant', constant_values=value)
+        eroded_padded_structure = binary_erosion(padded_structure, iterations=erosion_iterations)
+        eroded_structure = eroded_padded_structure[
+            erosion_iterations:-erosion_iterations,
+            erosion_iterations:-erosion_iterations,
+            erosion_iterations:-erosion_iterations
+        ]
+        if eroded_structure.shape != structure_mask.shape:
+            eroded_structure = np.zeros_like(structure_mask)
+        result[eroded_structure] = value
+    else:
+        if dilation_iterations > 0:
+            # Create a mask of all other values
+            other_values_mask = (data != 0) & (data != value)
             
-            # Pad the structure mask to prevent erosion at the edges
-            padded_structure = np.pad(structure_mask, pad_width=erosion_iterations, mode='constant', constant_values=value)
+            # Dilate the structure
+            # dilated_structure = binary_dilation(structure_mask, iterations=dilation_iterations)
             
-            # Erode the padded structure
-            eroded_padded_structure = binary_erosion(padded_structure, iterations=erosion_iterations)
+            dilated_structure = numba_dilation_3d_labels(structure_mask, dilation_iterations)
+            # Remove areas where dilation intersects with other values
+            final_dilated_structure = dilated_structure & ~other_values_mask
             
-            # Remove the padding after erosion
-            eroded_structure = eroded_padded_structure[
-                erosion_iterations:-erosion_iterations,
-                erosion_iterations:-erosion_iterations,
-                erosion_iterations:-erosion_iterations
-            ]
+            # Ensure dilation doesn't exceed the original label data boundaries
+            final_dilated_structure = final_dilated_structure & (original_label_data != 0)
             
-            # Ensure the eroded structure is within bounds
-            if eroded_structure.shape != structure_mask.shape:
-                eroded_structure = np.zeros_like(structure_mask)
-            result[eroded_structure] = value
+            # Apply the result
+            result[final_dilated_structure] = value
         else:
-            if dilation_iterations > 0:
-                # Dilate the original structure bounded by the original mask
-                dilation_mask = original_label_data != 0
-                dilated_structure = binary_dilation(structure_mask, iterations=dilation_iterations)
-                dilated_structure = dilated_structure & dilation_mask
-            else:
-                dilated_structure = structure_mask
-            result[dilated_structure] = value  
+            result[structure_mask] = value
+    
     return result
+
+@thread_worker
+def erode_dilate_labels_worker(data, erode=True, erosion_iterations=1, dilation_iterations=1, original_label_data=original_label_data):
+    unique_values = np.unique(data[(data > 0) & (data < 254)])
+    result = np.zeros_like(data, dtype=np.uint8)
+    
+    total_values = len(unique_values)
+    for i, value in enumerate(unique_values):
+        partial_result = process_value(value, data, erode, erosion_iterations, dilation_iterations, original_label_data)
+        result = np.maximum(result, partial_result)
+        yield i / total_values  # This will update the progress bar
+    
+    return result
+
+# Function to call from your Napari UI
+def erode_dilate_labels(viewer, data, erode=True, erosion_iterations=1, dilation_iterations=1):
+    worker = erode_dilate_labels_worker(data, erode, erosion_iterations, dilation_iterations)
+    
+    def update_progress(progress):
+        show_info(f"Processing: {progress:.0%}")
+    
+    def on_complete(result):
+        viewer.layers[label_name].data = result
+        show_info("Processing complete!")
+    
+    worker.yielded.connect(update_progress)
+    worker.returned.connect(on_complete)
+    worker.start()
 
 def shift_plane(layer, direction, padding_mode=False, padding=50):
     if isinstance(layer, Image) and viewer.dims.ndisplay == 3 and layer.depiction == 'plane':
@@ -715,7 +784,7 @@ def erode_labels(viewer):
         if response != QMessageBox.Yes:
             print('eroding labels cancelled')
             return 
-        labels_layer.data = erode_dilate_labels(labels_layer.data)
+        erode_dilate_labels(viewer, labels_layer.data)
         labels_layer.refresh()
 
         #update 3d label layer if it is visible
@@ -744,7 +813,7 @@ def dilate_labels(viewer):
         if response != QMessageBox.Yes:
             print('dilating labels cancelled')
             return 
-        labels_layer.data = erode_dilate_labels(labels_layer.data, erode=False)
+        erode_dilate_labels(viewer, labels_layer.data, erode=False)
         labels_layer.refresh()
 
         #update 3d label layer if it is visible
@@ -772,10 +841,11 @@ def save_labels(viewer):
     if not os.path.exists(output_path):
         os.makedirs(output_path)
     print(labels_layer.data.shape, labels_layer.data.dtype)
-    if prev_plane_info_var is not None:
-        cut_label_at_oblique_plane(viewer, switch=False, prev_plane_info=prev_plane_info_var)
-    else:
-        cut_label_at_oblique_plane(viewer, switch=False)
+    if label_3d_name in viewer.layers:
+        if prev_plane_info_var is not None:
+            cut_label_at_oblique_plane(viewer, switch=False, prev_plane_info=prev_plane_info_var)
+        else:
+            cut_label_at_oblique_plane(viewer, switch=False)
     
     nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), labels_layer.data)
     nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_raw.nrrd"), viewer.layers[data_name].data)
@@ -810,10 +880,10 @@ class CustomButtonWidget(QWidget):
 
 # UI functions for the buttons
 def dilate_labels():
-    erode_dilate_labels(viewer.layers[label_name].data, erode=False)
+    erode_dilate_labels(viewer, viewer.layers[label_name].data, erode=False)
 
 def erode_labels():
-    erode_dilate_labels(viewer.layers[label_name].data, erode=True)
+    erode_dilate_labels(viewer, viewer.layers[label_name].data, erode=True)
 
 def toggle_full_label_view():
     full_label_view(viewer)
