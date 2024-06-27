@@ -7,8 +7,8 @@ import blosc2
 from helper import *
 from napari.layers import Image
 from scipy.ndimage import binary_dilation, binary_erosion, binary_closing
-from qtpy.QtWidgets import QMessageBox
-from qtpy.QtCore import QTimer
+from qtpy.QtWidgets import QMessageBox,QPushButton, QLabel, QHBoxLayout, QVBoxLayout, QWidget
+from qtpy.QtCore import QTimer, Qt
 from magicgui import magicgui
 from magicgui.widgets import Container
 
@@ -26,8 +26,10 @@ padded_raw_data = []
 #nrrd zyx coord cubes
 nrrd_cube_path = os.path.join(current_directory, 'data/nrrd_cubes') #Change to the path of the folder containing the nrrd cubes
 raw_data, _ = nrrd.read(nrrd_cube_path+f'/volume_{z}_{y}_{x}.nrrd')
-label_data, _ = nrrd.read(nrrd_cube_path+f'/mask_{z}_{y}_{x}.nrrd')
+original_label_data, _ = nrrd.read(nrrd_cube_path+f'/mask_{z}_{y}_{x}.nrrd')
 padded_raw_data = get_padded_nrrd_data(nrrd_cube_path, (z, y, x), pad_amount)
+
+label_data = original_label_data
 data = raw_data
 
 # # #---Multi Res Zarr specific code, comment out if not using---
@@ -309,12 +311,12 @@ def erode_dilate_labels(data, erode=True, erosion_iterations=1, dilation_iterati
         else:
             if dilation_iterations > 0:
                 # Dilate the original structure
+                dilation_mask = original_label_data != 0
                 dilated_structure = binary_dilation(structure_mask, iterations=dilation_iterations)
+                dilated_structure = dilated_structure & dilation_mask
             else:
                 dilated_structure = structure_mask
-            result[dilated_structure] = value
-        
-        
+            result[dilated_structure] = value  
     return result
 
 def shift_plane(layer, direction, padding_mode=False, padding=50):
@@ -737,7 +739,7 @@ def dilate_labels(viewer):
     viewer.status = msg
     print(msg)
     if not pad_state:
-        msg = "Are you sure you want to dilate the labels? This operation cannot be undone."
+        msg = "Are you sure you want to dilate the labels? This operation cannot be undone. It will only dilate up to the borders of the original mask file."
         response = confirm_popup(msg)
         if response != QMessageBox.Yes:
             print('dilating labels cancelled')
@@ -782,42 +784,77 @@ def save_labels(viewer):
     msg = f"Layers saved to {output_path}"
     show_popup(msg)
 
-#UI buttons for learning the hotkey functions
-@magicgui(call_button="Dilate Labels")
-def dilate_labels_gui():
+# Define the minimum width for buttons
+MIN_BUTTON_WIDTH = 150  # Adjust this value as needed
+
+# Create a custom widget class for button and hotkey label
+class CustomButtonWidget(QWidget):
+    def __init__(self, button_text, hotkey, callback_function):
+        super().__init__()
+        layout = QHBoxLayout()
+        
+        # Create button
+        button = QPushButton(button_text)
+        button.setMinimumWidth(MIN_BUTTON_WIDTH)
+        button.clicked.connect(callback_function)
+        
+        # Create hotkey label
+        hotkey_label = QLabel(hotkey)
+        hotkey_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Add button and label to layout
+        layout.addWidget(button)
+        layout.addWidget(hotkey_label)
+        
+        self.setLayout(layout)
+
+# UI functions for the buttons
+def dilate_labels():
     erode_dilate_labels(viewer.layers[label_name].data, erode=False)
 
-@magicgui(call_button="Erode Labels")
-def erode_labels_gui():
+def erode_labels():
     erode_dilate_labels(viewer.layers[label_name].data, erode=True)
 
-@magicgui(call_button="Toggle 3D full label view")
-def full_label_view_gui():
+def toggle_full_label_view():
     full_label_view(viewer)
 
-@magicgui(call_button="Toggle 3D plane cut view")
-def switch_to_plane_gui():
+def toggle_3D_plane_cut_view():
     switch_to_plane(viewer)
 
-@magicgui(call_button="Toggle Padding on Data")
-def add_padding_contextual_data_gui():
+def toggle_padding_context():
     add_padding_contextual_data(viewer)
 
-@magicgui(call_button="Cut Label at Plane")
-def cut_label_at_plane_gui():
+def cut_label_at_plane():
     cut_label_at_oblique_plane(viewer)
 
-@magicgui(call_button="Connected Components", auto_call=True)
-def connected_components_gui():
+def connected_components():
     connected_components(viewer)
 
-@magicgui(call_button="Save Labels")
-def save_labels_gui():
+def save_labels():
     save_labels(viewer)
 
-container = Container(widgets=[dilate_labels_gui, erode_labels_gui, full_label_view_gui, switch_to_plane_gui, add_padding_contextual_data_gui, cut_label_at_plane_gui, connected_components_gui, save_labels_gui])
-viewer.window.add_dock_widget(container, area='right')
+# Create custom button widgets
+dilate_button = CustomButtonWidget("Dilate Labels", "u", dilate_labels)
+erode_button = CustomButtonWidget("Erode Labels", "i", erode_labels)
+full_view_button = CustomButtonWidget("Toggle Full Label View", "b", toggle_full_label_view)
+plane_cut_button = CustomButtonWidget("Toggle 3D Plane Cut View", "\\", toggle_3D_plane_cut_view)
+padding_button = CustomButtonWidget("Toggle Padding Context", "j", toggle_padding_context)
+cut_plane_button = CustomButtonWidget("Cut Label at Plane", "k", cut_label_at_plane)
+components_button = CustomButtonWidget("Connected Components", "c", connected_components)
+save_button = CustomButtonWidget("Save Labels", "h", save_labels)
 
+# Create a container widget
+container_widget = QWidget()
+container_layout = QVBoxLayout()
+container_widget.setLayout(container_layout)
+
+# Add buttons to the container
+for button in [dilate_button, erode_button, full_view_button, plane_cut_button, 
+                cut_plane_button, padding_button, components_button, save_button]:
+    container_layout.addWidget(button)
+
+# Add the container to the viewer
+viewer.window.add_dock_widget(container_widget, area='right')
 # Default napari settings for Vesuvius Volumetric Labeling
 viewer.axes.visible = True
 labels_layer.n_edit_dimensions = 3
