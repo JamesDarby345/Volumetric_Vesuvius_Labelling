@@ -114,6 +114,7 @@ compressed_class = 254
 pad_state = False
 erase_mode = False
 cut_side = True
+eraser_size = 4
 
 # Add the 3D data to the viewer
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
@@ -148,7 +149,7 @@ def draw_compressed_class(viewer):
     viewer.status = msg
     print(msg)
     labels_layer.selected_label = compressed_class
-    labels_layer.brush_size = 6
+    # labels_layer.brush_size = 6
     labels_layer.mode = 'paint'
 
 #keybind r to toggle the labels layer visibility
@@ -530,7 +531,7 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     new_label_layer.visible = visible_state
     new_label_layer.blending = 'opaque'
     new_label_layer.mode = active_mode
-    new_label_layer.brush_size = 4
+    # new_label_layer.brush_size = 4
 
     # Store the current state of the label_3d_name layer for future comparison
     previous_label_3d_data = new_label_data.copy()
@@ -596,17 +597,18 @@ viewer.window._qt_viewer.canvas.events.key_release.connect(stop_timers)
 #keybind ' to switch to eraser on the 3d label layer
 @viewer.bind_key('\'')
 def erase_3d_mode(viewer):
+    global eraser_size
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         viewer.layers[label_3d_name].mode = 'erase'
-        viewer.layers[label_3d_name].brush_size = 4
+        # viewer.layers[label_3d_name].brush_size = eraser_size
         viewer.layers.selection.active = viewer.layers[label_3d_name]
     elif viewer.dims.ndisplay == 3:
         viewer.layers[label_name].mode = 'erase'
-        viewer.layers[label_name].brush_size = 4
+        # viewer.layers[label_name].brush_size = eraser_size
         viewer.layers.selection.active = viewer.layers[label_name]
     elif viewer.dims.ndisplay == 2:
         viewer.layers[label_name].mode = 'erase'
-        viewer.layers[label_name].brush_size = 2
+        # viewer.layers[label_name].brush_size = eraser_size
         viewer.layers.selection.active = viewer.layers[label_name]
 
 #keybind , to enable the 3d slice erase mode
@@ -619,16 +621,14 @@ def erase_3d_mode(viewer):
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
       
         viewer.layers[label_3d_name].mode = 'erase'
-        viewer.layers[label_3d_name].brush_size = 4
+        # viewer.layers[label_3d_name].brush_size = 4
 
 #keybind ; to enable 3d pan_zoom/move mode
 @viewer.bind_key(';')
 def move_mode(viewer):
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         viewer.layers[label_3d_name].mode = 'pan_zoom'
-    elif viewer.dims.ndisplay == 3:
-        viewer.layers[label_name].mode = 'pan_zoom'
-    if viewer.dims.ndisplay == 2:
+    else:
         viewer.layers[label_name].mode = 'pan_zoom'
 
 # keybind k to cut the label layer at the oblique plane, also called by left and right arrow
@@ -895,7 +895,7 @@ viewer.window.add_dock_widget(container_widget, area='right')
 # Default napari settings for Vesuvius Volumetric Labeling
 viewer.axes.visible = True
 labels_layer.n_edit_dimensions = 3
-labels_layer.brush_size = 2
+labels_layer.brush_size = 3
 labels_layer.opacity = 0.5
 labels_layer.contour = 1
 viewer.theme = 'light'
