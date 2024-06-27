@@ -5,6 +5,7 @@ import numpy as np
 import zarr
 import blosc2
 from helper import *
+from gui_components import VesuviusGUI
 from napari.layers import Image
 from scipy.ndimage import binary_dilation, binary_erosion, binary_closing
 from qtpy.QtWidgets import QSizePolicy,QMessageBox,QPushButton, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QScrollArea
@@ -13,10 +14,6 @@ from magicgui import magicgui
 from magicgui.widgets import Container
 from napari.qt.threading import thread_worker
 from napari.utils.notifications import show_info
-from napari.utils.colormaps import colormap_utils, label_colormap, DirectLabelColormap
-from napari.utils.key_bindings import KeymapProvider
-from vispy.app import KeyEvent, MouseEvent
-from vispy.scene import SceneCanvas
 from napari.utils.interactions import mouse_press_callbacks, mouse_move_callbacks, mouse_release_callbacks
 
 
@@ -73,39 +70,6 @@ if bright_spot_masking:
     print(np.max(bright_spot_mask_arr  ))
     label_data[bright_spot_mask_arr] = 0
 
-instruction_text = """
-<b>Custom Napari Keybinds:</b><br>
-- <b>/ or r</b> to toggle label visibility<br>
-- <b>. or t</b> to toggle data visibility<br>
-- <b>Left & Right arrow keys</b> move through layers<br>
-- <b>Shift + Left & Right arrow keys</b> move 20 layers<br>
-- <b>k</b> to cut label at 3D plane location<br>
-- <b>l</b> to switch active layer to data layer <br>
-- <b>b</b> to toggle full 3D label view<br>
-- <b>\\</b> to toggle 3D plane cut view layers<br>
-- <b>'</b> to switch to erase mode<br>
-- <b>;</b> to switch to pan & zoom mode<br>
-- <b>,</b> to toggle 3d plane precision erase mode<br>
-- <b>o</b> to create off-axis plane cut in 3d mode <br>
-- <b>shift + click</b> to move the 3d volume plane quickly<br>
-- <b>shift + right click + drag up or down</b> to 'fisheye' the view<br>\n
-- <b>i</b> to erode labels 1 iteration<br>
-- <b>u</b> to dilate labels 1 iteration<br>
-- <b>j</b> to toggle context padding data<br>
-- <b>c</b> to run connected components analysis and relabel<br>
-- <b>f or down arrow</b> for 20 iteration flood fill<br>
-- <b>g or up arrow</b> for 100 iteration flood fill<br>
-- <b>h</b> to save data & labels as nrrd files<br>\n
-- <b>v</b> to toggle compressed region class brush<br>
-- <b>q</b> to decrease brush size<br>
-- <b>e</b> to increase brush size<br>
-- <b>w</b> to select label layer under cursor<br>
-- <b>s</b> to toggle show selected label<br>
-- <b>a</b> to move through layers in 2d<br>
-- <b>d</b> to move through layers in 2d<br>
-- <b>x</b> to extrapolate sparse compressed class labels<br>
-"""
-
 # Initialize the Napari viewer
 viewer = napari.Viewer()
 
@@ -120,6 +84,9 @@ pad_state = False
 erase_mode = False
 cut_side = True
 eraser_size = 4
+
+global erase_slice_width
+erase_slice_width = 30
 
 # Add the 3D data to the viewer
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
@@ -463,7 +430,7 @@ def switch_to_plane(viewer):
                 viewer.layers.selection.active = viewer.layers[layer.name]
 
 def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=None):
-    global previous_label_3d_data, manual_changes_mask, prev_plane_info_var
+    global previous_label_3d_data, manual_changes_mask, prev_plane_info_var, erase_slice_width
 
     data_plane = viewer.layers[data_name]
     if data_plane.depiction != 'plane':
@@ -509,11 +476,11 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     if cut_side:
         new_label_data[distances > 1.5] = 0
         if erase_mode:
-            new_label_data[distances < -30.5] = 0
+            new_label_data[distances < -erase_slice_width + 0.5] = 0
     else:
         new_label_data[distances < -1.5] = 0
         if erase_mode:
-            new_label_data[distances > 30.5] = 0
+            new_label_data[distances > erase_slice_width + 0.5] = 0
 
     # Remove the old label_3d_name layer if it exists
     visible_state = True
@@ -835,30 +802,6 @@ def save_labels(viewer):
     msg = f"Layers saved to {output_path}"
     show_popup(msg)
 
-# Define the minimum width for buttons
-MIN_BUTTON_WIDTH = 150  # Adjust this value as needed
-
-# Create a custom widget class for button and hotkey label
-class CustomButtonWidget(QWidget):
-    def __init__(self, button_text, hotkey, callback_function):
-        super().__init__()
-        layout = QHBoxLayout()
-        
-        # Create button
-        button = QPushButton(button_text)
-        button.setMinimumWidth(MIN_BUTTON_WIDTH)
-        button.clicked.connect(callback_function)
-        
-        # Create hotkey label
-        hotkey_label = QLabel(hotkey)
-        hotkey_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        # Add button and label to layout
-        layout.addWidget(button)
-        layout.addWidget(hotkey_label)
-        
-        self.setLayout(layout)
-
 # UI functions for the buttons
 def dilate_labels():
     erode_dilate_labels(viewer, viewer.layers[label_name].data, erode=False)
@@ -884,81 +827,27 @@ def run_connected_components():
 def save_labels_button():
     save_labels(viewer)
 
-# Create custom button widgets
-dilate_button = CustomButtonWidget("Dilate Labels", "u", dilate_labels)
-erode_button = CustomButtonWidget("Erode Labels", "i", erode_labels)
-full_view_button = CustomButtonWidget("Toggle Full Label View", "b", toggle_full_label_view)
-plane_cut_button = CustomButtonWidget("Toggle 3D Plane Cut View", "\\", toggle_3D_plane_cut_view)
-padding_button = CustomButtonWidget("Toggle Padding Context", "j", toggle_padding_context)
-cut_plane_button = CustomButtonWidget("Cut Label at Plane", "k", cut_label_at_plane_gui)
-components_button = CustomButtonWidget("Connected Components", "c", run_connected_components)
-save_button = CustomButtonWidget("Save Labels", "h", save_labels_button)
+# Create a dictionary of functions to pass to the GUI
+functions_dict = {
+    'erode_dilate_labels': erode_dilate_labels,
+    'full_label_view': full_label_view,
+    'switch_to_plane': switch_to_plane,
+    'add_padding_contextual_data': add_padding_contextual_data,
+    'cut_label_at_oblique_plane': cut_label_at_oblique_plane,
+    'connected_components': connected_components,
+    'save_labels': save_labels,
+}
 
-# Create a container widget for buttons
-button_container_widget = QWidget()
-button_container_layout = QVBoxLayout()
-button_container_widget.setLayout(button_container_layout)
+def update_global_erase_slice_width(value):
+    global erase_slice_width
+    erase_slice_width = value
+    print(f"Global erase width updated to: {erase_slice_width}")
 
-# Add buttons to the container
-for button in [dilate_button, erode_button, full_view_button, plane_cut_button, 
-                cut_plane_button, padding_button, components_button, save_button]:
-    button_container_layout.addWidget(button)
-
-color_picker_widget = ColorPickerWidget(viewer)
-button_container_layout.addWidget(color_picker_widget)
-
-# Create a container widget for the instruction text with scrollable area
-text_container_widget = QWidget()
-text_container_layout = QVBoxLayout()
-text_container_widget.setLayout(text_container_layout)
-
-instruction_label = QLabel(instruction_text)
-instruction_label.setWordWrap(True)
-instruction_label.setAlignment(Qt.AlignmentFlag.AlignTop)
-text_container_layout.addWidget(instruction_label)
-
-# Add the text container to a scroll area
-scroll_area = QScrollArea()
-scroll_area.setWidgetResizable(True)
-scroll_area.setWidget(text_container_widget)
-
-# Create a main container widget to hold both button and text containers
-main_container_widget = QWidget()
-main_container_layout = QVBoxLayout()
-main_container_widget.setLayout(main_container_layout)
-
-# Adjust size policies and layout properties
-main_container_widget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Maximum)
-main_container_layout.setContentsMargins(0, 0, 0, 0)
-main_container_layout.setSpacing(5)
-
-# Add button container to the main container
-main_container_layout.addWidget(button_container_widget)
-
-# Add the main container to the viewer
-viewer.window.add_dock_widget(main_container_widget, area='right')
-
-# Add the scroll area to the viewer as a separate dock widget
-viewer.window.add_dock_widget(scroll_area, area='right')
-
-# Default napari settings for Vesuvius Volumetric Labeling
-viewer.axes.visible = True
-labels_layer.n_edit_dimensions = 3
-# labels_layer.brush_size = 3
-labels_layer.opacity = 1
-labels_layer.contour = 1
-viewer.theme = 'light'
-viewer.window._qt_viewer.canvas.bgcolor = (0.68, 0.85, 0.90, 1.0)
-# viewer.layers[label_name].colormap = 'viridis'
+# Create the GUI
+gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width)
+gui.setup_napari_defaults()
 
 
-labels_layer.colormap = get_direct_label_colormap()
-labels_layer.shape = 'square'
-
-viewer.layers.selection.active = viewer.layers[label_name]
-
-# camera = viewer.window.qt_viewer.view.camera
-# camera.angles = (90, 180, 0)
 # Start the Napari event loop
 napari.run()
 
