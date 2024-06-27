@@ -13,6 +13,8 @@ from magicgui import magicgui
 from magicgui.widgets import Container
 from napari.qt.threading import thread_worker
 from napari.utils.notifications import show_info
+from napari.utils.colormaps import colormap_utils, label_colormap, DirectLabelColormap
+
 
 # Data location and size parameters
 scroll_name = 's1'
@@ -125,6 +127,7 @@ if os.path.exists(label_path):
     label_data, _ = nrrd.read(label_path)
     if bright_spot_masking:
         label_data = label_data * np.logical_not(bright_spot_mask(data))
+    # label_data = np.pad(label_data, pad_width=1, mode='constant', constant_values=0)
     labels_layer.data = label_data
 
 padded_labels = np.pad(label_data, pad_width=pad_amount, mode='constant', constant_values=0)
@@ -395,7 +398,7 @@ def full_label_view(viewer):
                 viewer.layers[layer.name].visible = False
             else:
                 viewer.layers[layer.name].visible = True
-                viewer.layers[layer.name].blending = 'minimum'
+                viewer.layers[layer.name].blending = 'opaque'
                 
     else:
         viewer.dims.ndisplay = 2
@@ -516,15 +519,8 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     
     # Add a new label layer with the updated data
     viewer.add_labels(new_label_data, name=label_3d_name)
-    if erase_mode:
-        # Generate 30 distinct colors
-        erase_colors = generate_distinct_colors(30)
-        # Create a dictionary with label values 1-30 as keys and colors as values
-        color_dict = {i+1: color for i, color in enumerate(erase_colors)}
-        viewer.layers[label_3d_name].color = color_dict
-    else:
-        # Reset to default colors
-        viewer.layers[label_3d_name].color = {}  # Empty dict resets to default
+    viewer.layers[label_3d_name].colormap = get_direct_label_colormap()
+    
     new_label_layer = viewer.layers[label_3d_name]
     new_label_layer.visible = visible_state
     new_label_layer.blending = 'opaque'
@@ -937,19 +933,24 @@ viewer.window.add_dock_widget(main_container_widget, area='right')
 # Add the scroll area to the viewer as a separate dock widget
 viewer.window.add_dock_widget(scroll_area, area='right')
 
-
-
 # Default napari settings for Vesuvius Volumetric Labeling
 viewer.axes.visible = True
 labels_layer.n_edit_dimensions = 3
-labels_layer.brush_size = 3
+# labels_layer.brush_size = 3
 labels_layer.opacity = 1
 labels_layer.contour = 1
 viewer.theme = 'light'
 viewer.window._qt_viewer.canvas.bgcolor = 'white'
+# viewer.layers[label_name].colormap = 'viridis'
+
+
+labels_layer.colormap = get_direct_label_colormap()
+labels_layer.shape = 'square'
 
 viewer.layers.selection.active = viewer.layers[label_name]
 
+camera = viewer.window.qt_viewer.view.camera
+camera.angles = (90, 180, 0)
 # Start the Napari event loop
 napari.run()
 

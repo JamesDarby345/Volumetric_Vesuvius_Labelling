@@ -12,6 +12,9 @@ import os
 import nrrd
 import colorsys
 from qtpy.QtWidgets import QMessageBox
+from napari.utils.colormaps import DirectLabelColormap
+from napari.utils.colormaps import Colormap
+from collections import defaultdict
 
 #helper functions for napari ui
 from collections import deque
@@ -393,3 +396,62 @@ def plot_segmentation_results(test_slice, segmentation):
     axes[1].set_title("Unmarked Boundary")
 
     plt.show()
+
+def get_slicer_colormap():
+    return {
+        0: [0, 0, 0, 0],
+        1: [128, 174, 128, 255],
+        2: [241, 214, 145, 255],
+        3: [177, 122, 101, 255],
+        4: [111, 184, 210, 255],
+        5: [216, 101, 79, 255],
+        6: [221, 130, 101, 255],
+        7: [144, 238, 144, 255],
+        8: [192, 104, 88, 255],
+        9: [220, 245, 20, 255],
+        10: [78, 63, 0, 255],
+        11: [255, 250, 220, 255],
+        12: [230, 220, 70, 255],
+        13: [200, 200, 235, 255],
+        14: [250, 250, 210, 255],
+        15: [244, 214, 49, 255],
+        16: [0, 151, 206, 255],
+        17: [216, 101, 79, 255],
+        18: [183, 156, 220, 255],
+        19: [183, 214, 211, 255],
+        20: [152, 189, 207, 255],
+        21: [111, 184, 210, 255],
+        22: [178, 212, 242, 255],
+        23: [68, 172, 100, 255],
+        24: [111, 197, 131, 255],
+        25: [85, 188, 255, 255],
+        26: [0, 145, 30, 255],
+        27: [214, 230, 130, 255],
+        28: [78, 63, 0, 255],
+        29: [218, 255, 255, 255],
+        30: [170, 250, 250, 255],
+        31: [140, 224, 228, 255],
+        32: [188, 65, 28, 255],
+        33: [216, 191, 216, 255],
+        34: [145, 60, 66, 255],
+        35: [150, 98, 83, 255],
+        36: [177, 122, 101, 255],
+        37: [244, 214, 49, 255],
+        38: [250, 250, 225, 255],
+        39: [200, 200, 215, 255],
+        40: [68, 131, 98, 255],
+    }
+
+def get_direct_label_colormap():
+    slicer_colormap = get_slicer_colormap()
+    
+    # Normalize colors to 0-1 range
+    normalized_colormap = defaultdict(lambda: np.array([0, 0, 0, 0]))
+    for k, color in slicer_colormap.items():
+        normalized_colormap[k] = np.array(color) / 255
+    
+    # Add None key with a default color (e.g., transparent black)
+    normalized_colormap[None] = np.array([0, 0, 0, 0])
+    
+    # Create the DirectLabelColormap
+    return DirectLabelColormap(color_dict=normalized_colormap)
