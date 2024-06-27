@@ -503,11 +503,11 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     if cut_side:
         new_label_data[distances > 1.5] = 0
         if erase_mode:
-            new_label_data[distances < -0.5] = 0
+            new_label_data[distances < -30.5] = 0
     else:
         new_label_data[distances < -1.5] = 0
         if erase_mode:
-            new_label_data[distances > 0.5] = 0
+            new_label_data[distances > 30.5] = 0
 
     # Remove the old label_3d_name layer if it exists
     visible_state = True
@@ -548,11 +548,26 @@ def on_left_arrow_event(viewer):
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
+@viewer.bind_key('Shift-Left', overwrite=True)
+def on_left_arrow_event(viewer):
+    global erase_mode, cut_side
+    shift_plane(viewer.layers[data_name], -20)
+    if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
+
 #keybind Right arrow to shift the plane along the normal vector in 3d viewing mode
 @viewer.bind_key('Right', overwrite=True)
 def on_right_arrow_event(viewer):
     global erase_mode, cut_side
     shift_plane(viewer.layers[data_name], 1)
+    if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
+
+#keybind Right arrow + shift to shift the plane along the normal vector 20 in 3d viewing mode
+@viewer.bind_key('Shift-Right', overwrite=True)
+def on_right_arrow_event(viewer):
+    global erase_mode, cut_side
+    shift_plane(viewer.layers[data_name], 20)
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
