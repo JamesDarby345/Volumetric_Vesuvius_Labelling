@@ -14,9 +14,9 @@ from magicgui.widgets import Container
 
 # Data location and size parameters
 scroll_name = 's1'
-x = 2256
-y = 2256
-z = 2256
+z = 7632
+y = 2768
+x = 5072
 chunk_size = 256
 pad_amount = 100
 current_directory = os.getcwd()
@@ -824,7 +824,7 @@ def toggle_3D_plane_cut_view():
 def toggle_padding_context():
     add_padding_contextual_data(viewer)
 
-def cut_label_at_plane():
+def cut_label_at_plane_gui():
     cut_label_at_oblique_plane(viewer)
 
 def connected_components():
