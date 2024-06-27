@@ -17,6 +17,17 @@ from napari.utils.notifications import show_info
 from napari.utils.interactions import mouse_press_callbacks, mouse_move_callbacks, mouse_release_callbacks
 import yaml
 from pathlib import Path
+import sys
+
+def read_hotkey_config(config_path='napari_config.yaml'):
+    config_path = Path(config_path)
+    if config_path.exists():
+        with open(config_path, 'r') as file:
+            config = yaml.safe_load(file)
+            return config.get('customizable_hotkeys', {})
+    return {}
+
+config = read_hotkey_config()
 
 # Data location and size parameters
 scroll_name = 's1'
@@ -110,13 +121,13 @@ if os.path.exists(compressed_path):
     viewer.add_labels(data, name=compressed_name)
 
 #keybind l to switch to the data layer as the active layer
-@viewer.bind_key('l')
+#@viewer.bind_key('l')
 def switch_to_data_layer(viewer):
     viewer.layers[data_name].visible = True
     viewer.layers.selection.active = viewer.layers[data_name]
     
 #keybind v to toggle settings to draw the compressed region class brush
-@viewer.bind_key('v')
+#@viewer.bind_key('v')
 def draw_compressed_class(viewer):
     msg = 'draw compressed class'
     viewer.status = msg
@@ -126,7 +137,7 @@ def draw_compressed_class(viewer):
     labels_layer.mode = 'paint'
 
 #keybind r to toggle the labels layer visibility
-@viewer.bind_key('r')
+#@viewer.bind_key('r')
 def toggle_labels_visibility(viewer):
     msg = 'toggle labels visibility'
     viewer.status = msg
@@ -137,10 +148,10 @@ def toggle_labels_visibility(viewer):
         labels_layer.visible = not labels_layer.visible
 
 #keybind / alt to toggle the labels layer visibility
-viewer.bind_key('/', toggle_labels_visibility)
+# viewer.bind_key('/', toggle_labels_visibility)
 
 #keybind . to toggle the data visibility
-@viewer.bind_key('.')
+#@viewer.bind_key('.')
 def toggle_data_visibility(viewer):
     msg = 'toggle data visibility'
     viewer.status = msg
@@ -152,10 +163,10 @@ def toggle_data_visibility(viewer):
         viewer.layers[label_3d_name].blending = 'opaque'
 
 #keybind t alt to toggle the data layer visibility
-viewer.bind_key('t', toggle_data_visibility)
+# viewer.bind_key('t', toggle_data_visibility)
 
 #keybind q to decrease the brush size of the labels layer
-@viewer.bind_key('q')
+#@viewer.bind_key('q')
 def decrease_brush_size(viewer):
     msg = 'decrease brush size'
     viewer.status = msg
@@ -163,7 +174,7 @@ def decrease_brush_size(viewer):
     labels_layer.brush_size = labels_layer.brush_size - 1
 
 #keybind e to increase the brush size of the labels layer
-@viewer.bind_key('e')
+#@viewer.bind_key('e')
 def increase_brush_size(viewer):
     msg = 'increase brush size'
     viewer.status = msg
@@ -171,7 +182,7 @@ def increase_brush_size(viewer):
     labels_layer.brush_size = labels_layer.brush_size + 1
 
 #keybind s to toggle the show selected label only mode
-@viewer.bind_key('s')
+#@viewer.bind_key('s')
 def toggle_show_selected_label(viewer):
     msg = 'toggle show selected label'
     viewer.status = msg
@@ -197,12 +208,12 @@ def capture_cursor_info(event):
 
 # keybind w to capture cursor info and select the label under the cursor
 # 4 and the color picker also works for this
-@viewer.bind_key('w')
-def on_w_key(event):
+#@viewer.bind_key('w')
+def label_picker(event):
     capture_cursor_info(event)
 
 #keybind x to run the new compressed label interpolation function
-@viewer.bind_key('x')
+#@viewer.bind_key('x')
 def interpolate_borders(viewer):
     msg = "Are you sure you want to interpolate the compressed region class? This operation cannot be undone and removes the undo queue. It may also take a few seconds to minutes."
     response = confirm_popup(msg)
@@ -221,7 +232,7 @@ def interpolate_borders(viewer):
 flood_fill_layer = viewer.add_labels(np.zeros_like(data), name=ff_name)
 
 #keybind f to run the flood fill function with a distance of 20
-@viewer.bind_key('f')
+#@viewer.bind_key('f')
 def flood_fill(viewer, distance=20):
     msg = 'flood fill'
     viewer.status = msg
@@ -243,19 +254,9 @@ def flood_fill(viewer, distance=20):
     flood_fill_layer.data = flood_fill_result
 
 #keybind g to run the flood fill function with a distance of 100
-@viewer.bind_key('g')
-def on_g_event(viewer):
+#@viewer.bind_key('g')
+def large_flood_fill(viewer):
     flood_fill(viewer, 100)
-
-#keybind up arrow alt to run the flood fill function with a distance of 100
-@viewer.bind_key('Up')
-def on_up_arrow_event(viewer):
-    flood_fill(viewer, 100)
-
-#keybind down arrow alt to run the flood fill function with a distance of 20
-@viewer.bind_key('Down')
-def on_down_arrow_event(viewer):
-    flood_fill(viewer, 20)
 
 # Variable to store the previous oblique plane information
 prev_plane_info_var = None
@@ -361,7 +362,7 @@ def shift_plane(layer, direction, padding_mode=False, padding=50):
         print("Cannot shift: not in plane mode or 2D view")
 
 #keybind b to switch to full label 3d view
-@viewer.bind_key('b', overwrite=True)
+#@viewer.bind_key('b', overwrite=True)
 def full_label_view(viewer):
     if viewer.dims.ndisplay == 2:
         viewer.dims.ndisplay = 3
@@ -387,7 +388,7 @@ def full_label_view(viewer):
 
 
 #keybind \ to setup the 3d viewing mode conviniently with custom vesuvius layers
-@viewer.bind_key('\\')
+#@viewer.bind_key('\\')
 def switch_to_plane(viewer):
    # Switch to 3D mode
     if viewer.dims.ndisplay == 3:
@@ -507,7 +508,7 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     viewer.layers[label_3d_name].refresh()
 
 #keybind Left arrow  to shift the plane along the normal vector in 3d viewing mode
-@viewer.bind_key('Left', overwrite=True)
+#@viewer.bind_key('Left', overwrite=True)
 def on_left_arrow_event(viewer):
     global erase_mode, cut_side
     
@@ -515,8 +516,8 @@ def on_left_arrow_event(viewer):
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
-@viewer.bind_key('Shift-Left', overwrite=True)
-def on_left_arrow_event(viewer):
+#@viewer.bind_key('Shift-Left', overwrite=True)
+def on_shift_left_arrow_event(viewer):
     global erase_mode, cut_side, erase_slice_width
     if erase_mode:
         shift_plane(viewer.layers[data_name], -erase_slice_width)
@@ -526,7 +527,7 @@ def on_left_arrow_event(viewer):
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
 #keybind Right arrow to shift the plane along the normal vector in 3d viewing mode
-@viewer.bind_key('Right', overwrite=True)
+#@viewer.bind_key('Right', overwrite=True)
 def on_right_arrow_event(viewer):
     global erase_mode, cut_side
     shift_plane(viewer.layers[data_name], 1)
@@ -534,8 +535,8 @@ def on_right_arrow_event(viewer):
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
 #keybind Right arrow + shift to shift the plane along the normal vector 20 in 3d viewing mode
-@viewer.bind_key('Shift-Right', overwrite=True)
-def on_right_arrow_event(viewer):
+#@viewer.bind_key('Shift-Right', overwrite=True)
+def on_shift_right_arrow_event(viewer):
     global erase_mode, cut_side, erase_slice_width
     if erase_mode:
         shift_plane(viewer.layers[data_name], erase_slice_width)
@@ -560,14 +561,14 @@ left_timer.timeout.connect(lambda: move_left(viewer))
 right_timer.timeout.connect(lambda: move_right(viewer))
 
 # Define the key press events
-@viewer.bind_key('a', overwrite=True)
-def start_left_timer(viewer):
+#@viewer.bind_key('a', overwrite=True)
+def shift_dim_left(viewer):
     move_left(viewer)  # Move immediately on key press
     if not left_timer.isActive():
         left_timer.start(100)  # Adjust the interval as needed
 
-@viewer.bind_key('d', overwrite=True)
-def start_right_timer(viewer):
+#@viewer.bind_key('d', overwrite=True)
+def shift_dim_right(viewer):
     move_right(viewer)  # Move immediately on key press
     if not right_timer.isActive():
         right_timer.start(100)  # Adjust the interval as needed
@@ -583,7 +584,7 @@ def stop_timers(event):
 viewer.window._qt_viewer.canvas.events.key_release.connect(stop_timers)
 
 #keybind ' to switch to eraser on the 3d label layer
-@viewer.bind_key('\'')
+#@viewer.bind_key('\'')
 def erase_3d_mode(viewer):
     global eraser_size
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
@@ -600,8 +601,8 @@ def erase_3d_mode(viewer):
         viewer.layers.selection.active = viewer.layers[label_name]
 
 #keybind , to enable the 3d slice erase mode
-@viewer.bind_key(',')
-def erase_3d_mode(viewer):
+#@viewer.bind_key(',')
+def plane_erase_3d_mode(viewer):
     global erase_mode, cut_side
     erase_mode = not erase_mode
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
@@ -612,7 +613,7 @@ def erase_3d_mode(viewer):
         # viewer.layers[label_3d_name].brush_size = 4
 
 #keybind ; to enable 3d pan_zoom/move mode
-@viewer.bind_key(';')
+#@viewer.bind_key(';')
 def move_mode(viewer):
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         viewer.layers[label_3d_name].mode = 'pan_zoom'
@@ -620,7 +621,7 @@ def move_mode(viewer):
         viewer.layers[label_name].mode = 'pan_zoom'
 
 # keybind k to cut the label layer at the oblique plane, also called by left and right arrow
-@viewer.bind_key('k', overwrite=True)
+#@viewer.bind_key('k', overwrite=True)
 def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
     global cut_side
     if switch:
@@ -634,7 +635,7 @@ def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
         viewer.layers[label_name].visible = False
 
 #run connected components on the labels layer to get instance segmentations
-@viewer.bind_key('c')
+#@viewer.bind_key('c')
 def connected_components(viewer):
     msg = 'connected components'
     viewer.status = msg
@@ -686,7 +687,7 @@ def connected_components(viewer):
 
 #keybind j to add context padding to the data layer
 pad_key = 'j'
-@viewer.bind_key(pad_key)
+#@viewer.bind_key(pad_key)
 def add_padding_contextual_data(viewer):
     global pad_state, previous_label_3d_data, manual_changes_mask
 
@@ -727,7 +728,7 @@ def add_padding_contextual_data(viewer):
         pad_state = True
 
 #keybind i to erode the labels layer
-@viewer.bind_key('i')
+#@viewer.bind_key('i')
 def erode_labels(viewer):
     global pad_state
     msg = 'eroding labels'
@@ -756,7 +757,7 @@ def erode_labels(viewer):
     print(msg)
 
 #keybind u to dilate the labels layer
-@viewer.bind_key('u')
+#@viewer.bind_key('u')
 def dilate_labels(viewer):
     global pad_state
     msg = 'dilating labels'
@@ -785,7 +786,7 @@ def dilate_labels(viewer):
     print(msg)
 
 #Keybind h to save the labels, raw and compressed class layer
-@viewer.bind_key('h')
+#@viewer.bind_key('h')
 def save_labels(viewer):
     msg = 'save labels'
     viewer.status = msg
@@ -810,33 +811,34 @@ def save_labels(viewer):
     show_popup(msg)
 
 # UI functions for the buttons
-def dilate_labels():
-    erode_dilate_labels(viewer, viewer.layers[label_name].data, erode=False)
+# def dilate_labels_gui():
+#     dilate_labels(viewer, viewer.layers[label_name].data, erode=False)
 
-def erode_labels():
-    erode_dilate_labels(viewer, viewer.layers[label_name].data, erode=True)
+# def erode_labels_gui():
+#     erode_labels(viewer)
 
-def toggle_full_label_view():
-    full_label_view(viewer)
+# def toggle_full_label_view():
+#     full_label_view(viewer)
 
-def toggle_3D_plane_cut_view():
-    switch_to_plane(viewer)
+# def toggle_3D_plane_cut_view():
+#     switch_to_plane(viewer)
 
-def toggle_padding_context():
-    add_padding_contextual_data(viewer)
+# def toggle_padding_context():
+#     add_padding_contextual_data(viewer)
 
-def cut_label_at_plane_gui():
-    cut_label_at_oblique_plane(viewer)
+# def cut_label_at_plane_gui():
+#     cut_label_at_oblique_plane(viewer)
 
-def run_connected_components():
-    connected_components(viewer)
+# def run_connected_components():
+#     connected_components(viewer)
 
-def save_labels_button():
-    save_labels(viewer)
+# def save_labels_button():
+#     save_labels(viewer)
 
 # Create a dictionary of functions to pass to the GUI
 functions_dict = {
-    'erode_dilate_labels': erode_dilate_labels,
+    'erode_labels': erode_labels,
+    'dilate_labels': dilate_labels,
     'full_label_view': full_label_view,
     'switch_to_plane': switch_to_plane,
     'add_padding_contextual_data': add_padding_contextual_data,
@@ -851,9 +853,37 @@ def update_global_erase_slice_width(value):
     print(f"Global erase width updated to: {erase_slice_width}")
 
 # Create the GUI
-gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width)
+gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, config)
 gui.setup_napari_defaults()
 
+def bind_hotkeys(viewer, config, module=None, overwrite=True):
+    if module is None:
+        module = sys.modules['__main__']  # Get the main module
+    
+    for func_name, keys in config.items():
+        # First, try to find the function in the viewer
+        if hasattr(viewer, func_name):
+            func = getattr(viewer, func_name)
+        # If not in viewer, try to find it in the main module
+        elif hasattr(module, func_name):
+            func = getattr(module, func_name)
+        else:
+            print(f"Warning: Function '{func_name}' not found")
+            continue
+
+        if isinstance(keys, list):
+            for key in keys:
+                try:
+                    viewer.bind_key(key, func, overwrite=overwrite)
+                except ValueError as e:
+                    print(f"Error binding key '{key}' to function '{func_name}': {str(e)}")
+        else:
+            try:
+                viewer.bind_key(keys, func, overwrite=overwrite)
+            except ValueError as e:
+                print(f"Error binding key '{keys}' to function '{func_name}': {str(e)}")
+
+bind_hotkeys(viewer, config)
 
 # Start the Napari event loop
 napari.run()

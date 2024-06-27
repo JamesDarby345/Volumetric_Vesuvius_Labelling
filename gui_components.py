@@ -1,12 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QPushButton, QLabel, 
                              QVBoxLayout, QScrollArea, QSizePolicy, QSpinBox)
 from PyQt5.QtCore import Qt
-
 from helper import *
-# Import necessary functions and classes from your main file
-# from napari_volumetric_labelling import (erode_dilate_labels, full_label_view, switch_to_plane,
-#                        add_padding_contextual_data, cut_label_at_oblique_plane,
-#                        connected_components, save_labels)
 
 MIN_BUTTON_WIDTH = 150
 
@@ -54,23 +49,31 @@ class CustomButtonWidget(QWidget):
         self.setLayout(layout)
 
 class VesuviusGUI:
-    def __init__(self, viewer, functions_dict, update_global_erase_slice_width):
+    def __init__(self, viewer, functions_dict, update_global_erase_slice_width, config):
         self.viewer = viewer
         self.functions = functions_dict  # Store the functions dictionary
         self.update_global_erase_slice_width = update_global_erase_slice_width
         self.erase_slice_width = 30
+        self.config = config
         self.setup_gui()
+        
+    def get_key_string(self, func):
+        keys = self.config.get(func, [])
+        if isinstance(keys, list):
+            return ' or '.join(keys)
+        return str(keys)
 
     def setup_gui(self):
         # Create custom button widgets
-        self.dilate_button = CustomButtonWidget("Dilate Labels", "u", self.dilate_labels)
-        self.erode_button = CustomButtonWidget("Erode Labels", "i", self.erode_labels)
-        self.full_view_button = CustomButtonWidget("Toggle Full Label View", "b", self.toggle_full_label_view)
-        self.plane_cut_button = CustomButtonWidget("Toggle 3D Plane Cut View", "\\", self.toggle_3D_plane_cut_view)
-        self.padding_button = CustomButtonWidget("Toggle Padding Context", "j", self.toggle_padding_context)
-        self.cut_plane_button = CustomButtonWidget("Cut Label at Plane", "k", self.cut_label_at_plane_gui)
-        self.components_button = CustomButtonWidget("Connected Components", "c", self.run_connected_components)
-        self.save_button = CustomButtonWidget("Save Labels", "h", self.save_labels_button)
+        self.dilate_button = CustomButtonWidget("Dilate Labels", self.get_key_string('dilate_labels'), self.dilate_labels_gui)
+        self.erode_button = CustomButtonWidget("Erode Labels", self.get_key_string('erode_labels'), self.erode_labels_gui)
+        self.full_view_button = CustomButtonWidget("Toggle Full Label View", self.get_key_string('full_label_view'), self.toggle_full_label_view)
+        self.plane_cut_button = CustomButtonWidget("Toggle 3D Plane Cut View", self.get_key_string('switch_to_plane'), self.toggle_3D_plane_cut_view)
+        self.padding_button = CustomButtonWidget("Toggle Padding Context", self.get_key_string('add_padding_contextual_data'), self.toggle_padding_context)
+        self.cut_plane_button = CustomButtonWidget("Cut Label at Plane", self.get_key_string('cut_label_at_oblique_plane'), self.cut_label_at_plane_gui)
+        self.components_button = CustomButtonWidget("Connected Components", self.get_key_string('connected_components'), self.run_connected_components)
+        self.save_button = CustomButtonWidget("Save Labels", self.get_key_string('save_labels'), self.save_labels_button)
+    
         color_picker_widget = ColorPickerWidget(self.viewer)
 
         # Create erase width input
@@ -102,7 +105,7 @@ class VesuviusGUI:
         text_container_layout = QVBoxLayout()
         text_container_widget.setLayout(text_container_layout)
 
-        instruction_label = QLabel(self.get_instruction_text())
+        instruction_label = QLabel(self.get_instruction_text(self.config))
         instruction_label.setWordWrap(True)
         instruction_label.setAlignment(Qt.AlignmentFlag.AlignTop)
         text_container_layout.addWidget(instruction_label)
@@ -149,11 +152,11 @@ class VesuviusGUI:
         self.viewer.layers.selection.active = labels_layer
 
     # Define button callback methods
-    def dilate_labels(self):
-        self.functions['erode_dilate_labels'](self.viewer, self.viewer.layers[self.get_label_layer_name()].data, erode=False)
+    def dilate_labels_gui(self):
+        self.functions['dilate_labels'](self.viewer)
 
-    def erode_labels(self):
-        self.functions['erode_dilate_labels'](self.viewer, self.viewer.layers[self.get_label_layer_name()].data, erode=True)
+    def erode_labels_gui(self):
+        self.functions['erode_labels'](self.viewer)
 
     def toggle_full_label_view(self):
         self.functions['full_label_view'](self.viewer)
@@ -173,39 +176,55 @@ class VesuviusGUI:
     def save_labels_button(self):
         self.functions['save_labels'](self.viewer)
 
-    @staticmethod
-    def get_instruction_text():
-        instruction_text = """
+    def get_instruction_text(self, config):
+        # Create a reverse mapping of function to keys
+        function_to_keys = {}
+        for func, keys in config.items():  # Removed ['customizable_hotkeys']
+            if isinstance(keys, list):
+                for key in keys:
+                    if func not in function_to_keys:
+                        function_to_keys[func] = []
+                    function_to_keys[func].append(key)
+            else:
+                if func not in function_to_keys:
+                    function_to_keys[func] = []
+                function_to_keys[func].append(keys)
+
+        # Function to get a string of keys for a function
+        def get_key_string(func):
+            keys = function_to_keys.get(func, [])
+            return ' or '.join(f'<b>{key}</b>' for key in keys)
+
+        instruction_text = f"""
         <b>Custom Napari Keybinds:</b><br>
-        - <b>/ or r</b> to toggle label visibility<br>
-        - <b>. or t</b> to toggle data visibility<br>
-        - <b>Left & Right arrow keys</b> move through layers<br>
-        - <b>Shift + Left & Right arrow keys</b> move 20 layers<br>
-        - <b>k</b> to cut label at 3D plane location<br>
-        - <b>l</b> to switch active layer to data layer <br>
-        - <b>b</b> to toggle full 3D label view<br>
-        - <b>\\</b> to toggle 3D plane cut view layers<br>
-        - <b>'</b> to switch to erase mode<br>
-        - <b>;</b> to switch to pan & zoom mode<br>
-        - <b>,</b> to toggle 3d plane precision erase mode<br>
-        - <b>o</b> to create off-axis plane cut in 3d mode <br>
-        - <b>shift + click</b> to move the 3d volume plane quickly<br>
+        - {get_key_string('toggle_labels_visibility')} to toggle label visibility<br>
+        - {get_key_string('toggle_data_visibility')} to toggle data visibility<br>
+        - {get_key_string('on_left_arrow_event')} & {get_key_string('on_right_arrow_event')} to move through layers<br>
+        - {get_key_string('on_shift_left_arrow_event')} & {get_key_string('on_shift_right_arrow_event')} to move through layers faster<br>
+        - {get_key_string('cut_label_at_oblique_plane')} to cut label at 3D plane location<br>
+        - {get_key_string('switch_to_data_layer')} to switch active layer to data layer<br>
+        - {get_key_string('full_label_view')} to toggle full 3D label view<br>
+        - {get_key_string('switch_to_plane')} to toggle 3D plane cut view layers<br>
+        - {get_key_string('erase_3d_mode')} to switch to erase mode<br>
+        - {get_key_string('move_mode')} to switch to pan & zoom mode<br>
+        - {get_key_string('plane_erase_3d_mode')} to toggle 3D plane precision erase mode<br>
+        - <b>shift + click</b> to move the 3D volume plane quickly<br>
         - <b>shift + right click + drag up or down</b> to 'fisheye' the view<br>\n
-        - <b>i</b> to erode labels 1 iteration<br>
-        - <b>u</b> to dilate labels 1 iteration<br>
-        - <b>j</b> to toggle context padding data<br>
-        - <b>c</b> to run connected components analysis and relabel<br>
-        - <b>f or down arrow</b> for 20 iteration flood fill<br>
-        - <b>g or up arrow</b> for 100 iteration flood fill<br>
-        - <b>h</b> to save data & labels as nrrd files<br>\n
-        - <b>v</b> to toggle compressed region class brush<br>
-        - <b>q</b> to decrease brush size<br>
-        - <b>e</b> to increase brush size<br>
-        - <b>w</b> to select label layer under cursor<br>
-        - <b>s</b> to toggle show selected label<br>
-        - <b>a</b> to move through layers in 2d<br>
-        - <b>d</b> to move through layers in 2d<br>
-        - <b>x</b> to extrapolate sparse compressed class labels<br>
+        - {get_key_string('erode_labels')} to erode labels 1 iteration<br>
+        - {get_key_string('dilate_labels')} to dilate labels 1 iteration<br>
+        - {get_key_string('add_padding_contextual_data')} to toggle context padding data<br>
+        - {get_key_string('connected_components')} to run connected components analysis and relabel<br>
+        - {get_key_string('flood_fill')} for standard flood fill<br>
+        - {get_key_string('large_flood_fill')} for larger flood fill<br>
+        - {get_key_string('save_labels')} to save data & labels as nrrd files<br>\n
+        - {get_key_string('draw_compressed_class')} to toggle compressed region class brush<br>
+        - {get_key_string('decrease_brush_size')} to decrease brush size<br>
+        - {get_key_string('increase_brush_size')} to increase brush size<br>
+        - {get_key_string('label_picker')} to select label layer under cursor<br>
+        - {get_key_string('toggle_show_selected_label')} to toggle show selected label<br>
+        - {get_key_string('shift_dim_left')} to shift dimension left in 2D<br>
+        - {get_key_string('shift_dim_right')} to shift dimension right in 2D<br>
+        - {get_key_string('interpolate_borders')} to extrapolate sparse compressed class labels<br>
         """
         return instruction_text
 
