@@ -510,14 +510,18 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
 @viewer.bind_key('Left', overwrite=True)
 def on_left_arrow_event(viewer):
     global erase_mode, cut_side
+    
     shift_plane(viewer.layers[data_name], -1)
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
 @viewer.bind_key('Shift-Left', overwrite=True)
 def on_left_arrow_event(viewer):
-    global erase_mode, cut_side
-    shift_plane(viewer.layers[data_name], -20)
+    global erase_mode, cut_side, erase_slice_width
+    if erase_mode:
+        shift_plane(viewer.layers[data_name], -erase_slice_width)
+    else:
+        shift_plane(viewer.layers[data_name], -20)
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
@@ -532,8 +536,11 @@ def on_right_arrow_event(viewer):
 #keybind Right arrow + shift to shift the plane along the normal vector 20 in 3d viewing mode
 @viewer.bind_key('Shift-Right', overwrite=True)
 def on_right_arrow_event(viewer):
-    global erase_mode, cut_side
-    shift_plane(viewer.layers[data_name], 20)
+    global erase_mode, cut_side, erase_slice_width
+    if erase_mode:
+        shift_plane(viewer.layers[data_name], erase_slice_width)
+    else:
+        shift_plane(viewer.layers[data_name], 20)
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 

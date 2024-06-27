@@ -456,26 +456,3 @@ def get_direct_label_colormap():
     
     # Create the DirectLabelColormap
     return DirectLabelColormap(color_dict=normalized_colormap)
-
-def pick_color(viewer):
-    # Open a color picker dialog
-    color = QColorDialog.getColor()
-
-    if color.isValid():
-        # Convert QColor to a tuple of RGBA values normalized to [0, 1]
-        color_tuple = (color.redF(), color.greenF(), color.blueF(), color.alphaF())
-        # Set the background color of the canvas
-        viewer.window._qt_viewer.canvas.bgcolor = color_tuple
-
-# Create a custom widget with a button to open the color picker
-class ColorPickerWidget(QWidget):
-    def __init__(self, viewer):
-        super().__init__()
-        self.viewer = viewer
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-
-        # Create a button to open the color picker
-        button = QPushButton("Pick Background Color")
-        button.clicked.connect(lambda: pick_color(self.viewer))
-        layout.addWidget(button)
