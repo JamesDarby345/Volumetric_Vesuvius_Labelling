@@ -507,9 +507,19 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     viewer.layers[label_name].refresh()
     viewer.layers[label_3d_name].refresh()
 
+def plane_3d_erase_mode_shift_left(viewer):
+    global erase_mode
+    if erase_mode:
+        shift_plane(viewer.layers[data_name], -erase_slice_width)
+
+def plane_3d_erase_mode_shift_right(viewer):
+    global erase_mode
+    if erase_mode:
+        shift_plane(viewer.layers[data_name], erase_slice_width)
+
 #keybind Left arrow  to shift the plane along the normal vector in 3d viewing mode
 #@viewer.bind_key('Left', overwrite=True)
-def on_left_arrow_event(viewer):
+def shift_plane_left(viewer):
     global erase_mode, cut_side
     
     shift_plane(viewer.layers[data_name], -1)
@@ -517,7 +527,7 @@ def on_left_arrow_event(viewer):
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
 #@viewer.bind_key('Shift-Left', overwrite=True)
-def on_shift_left_arrow_event(viewer):
+def shift_plane_left_fast(viewer):
     global erase_mode, cut_side, erase_slice_width
     if erase_mode:
         shift_plane(viewer.layers[data_name], -erase_slice_width)
@@ -528,7 +538,7 @@ def on_shift_left_arrow_event(viewer):
 
 #keybind Right arrow to shift the plane along the normal vector in 3d viewing mode
 #@viewer.bind_key('Right', overwrite=True)
-def on_right_arrow_event(viewer):
+def shift_plane_right(viewer):
     global erase_mode, cut_side
     shift_plane(viewer.layers[data_name], 1)
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
@@ -536,7 +546,7 @@ def on_right_arrow_event(viewer):
 
 #keybind Right arrow + shift to shift the plane along the normal vector 20 in 3d viewing mode
 #@viewer.bind_key('Shift-Right', overwrite=True)
-def on_shift_right_arrow_event(viewer):
+def shift_plane_right_fast(viewer):
     global erase_mode, cut_side, erase_slice_width
     if erase_mode:
         shift_plane(viewer.layers[data_name], erase_slice_width)
@@ -861,6 +871,11 @@ def bind_hotkeys(viewer, config, module=None, overwrite=True):
         module = sys.modules['__main__']  # Get the main module
     
     for func_name, keys in config.items():
+        # Skip if keys is None, an empty string, or an empty list
+        if keys is None or keys == "" or (isinstance(keys, list) and len(keys) == 0):
+            print(f"Warning: No key binding specified for function '{func_name}'. Skipping.")
+            continue
+
         # First, try to find the function in the viewer
         if hasattr(viewer, func_name):
             func = getattr(viewer, func_name)
@@ -868,19 +883,20 @@ def bind_hotkeys(viewer, config, module=None, overwrite=True):
         elif hasattr(module, func_name):
             func = getattr(module, func_name)
         else:
-            print(f"Warning: Function '{func_name}' not found")
+            print(f"Warning: Function '{func_name}' not found. Skipping.")
             continue
 
         if isinstance(keys, list):
             for key in keys:
-                try:
-                    viewer.bind_key(key, func, overwrite=overwrite)
-                except ValueError as e:
-                    print(f"Error binding key '{key}' to function '{func_name}': {str(e)}")
-        else:
+                if key:  # Only bind if key is not an empty string
+                    try:
+                        viewer.bind_key(key, func, overwrite=overwrite)
+                    except (ValueError, TypeError) as e:
+                        print(f"Error binding key '{key}' to function '{func_name}': {str(e)}")
+        elif keys:  # Only bind if keys is not an empty string
             try:
                 viewer.bind_key(keys, func, overwrite=overwrite)
-            except ValueError as e:
+            except (ValueError, TypeError) as e:
                 print(f"Error binding key '{keys}' to function '{func_name}': {str(e)}")
 
 bind_hotkeys(viewer, config)

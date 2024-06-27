@@ -56,7 +56,7 @@ class VesuviusGUI:
         self.erase_slice_width = 30
         self.config = config
         self.setup_gui()
-        
+
     def get_key_string(self, func):
         keys = self.config.get(func, [])
         if isinstance(keys, list):
@@ -177,9 +177,22 @@ class VesuviusGUI:
         self.functions['save_labels'](self.viewer)
 
     def get_instruction_text(self, config):
+        def key_to_string(key):
+            key_map = {
+                'Left': 'Left Arrow',
+                'Right': 'Right Arrow',
+                'Up': 'Up Arrow',
+                'Down': 'Down Arrow',
+                'Shift-Left': 'Shift + Left Arrow',
+                'Shift-Right': 'Shift + Right Arrow',
+                'Shift-Up': 'Shift + Up Arrow',
+                'Shift-Down': 'Shift + Down Arrow',
+            }
+            return key_map.get(key, key)
+
         # Create a reverse mapping of function to keys
         function_to_keys = {}
-        for func, keys in config.items():  # Removed ['customizable_hotkeys']
+        for func, keys in config.items():
             if isinstance(keys, list):
                 for key in keys:
                     if func not in function_to_keys:
@@ -193,14 +206,14 @@ class VesuviusGUI:
         # Function to get a string of keys for a function
         def get_key_string(func):
             keys = function_to_keys.get(func, [])
-            return ' or '.join(f'<b>{key}</b>' for key in keys)
+            return ' or '.join(f'<b>{key_to_string(key)}</b>' for key in keys if key)
 
         instruction_text = f"""
         <b>Custom Napari Keybinds:</b><br>
         - {get_key_string('toggle_labels_visibility')} to toggle label visibility<br>
         - {get_key_string('toggle_data_visibility')} to toggle data visibility<br>
-        - {get_key_string('on_left_arrow_event')} & {get_key_string('on_right_arrow_event')} to move through layers<br>
-        - {get_key_string('on_shift_left_arrow_event')} & {get_key_string('on_shift_right_arrow_event')} to move through layers faster<br>
+        - {get_key_string('shift_plane_left')} & {get_key_string('shift_plane_right')} to move through layers<br>
+        - {get_key_string('shift_plane_left_fast')} & {get_key_string('shift_plane_right_fast')} to move through layers faster<br>
         - {get_key_string('cut_label_at_oblique_plane')} to cut label at 3D plane location<br>
         - {get_key_string('switch_to_data_layer')} to switch active layer to data layer<br>
         - {get_key_string('full_label_view')} to toggle full 3D label view<br>
