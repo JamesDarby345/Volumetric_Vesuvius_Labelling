@@ -69,26 +69,30 @@ if bright_spot_masking:
     label_data[bright_spot_mask_arr] = 0
 
 # ## Custom Napari Keybinds:<br>
-# v to toggle compressed region class brush<br>
 # / or r to toggle label visibility<br>
 # . or t to toggle data visibility<br>
 # Left & Right arrow keys scrub through layers in 2D & 3D planes<br>
 # k to cut label at 3D plane location, toggles displayed side of cut<br>
 # l to switch active layer to data layer (useful to move 3d plane with shift click)<br>
-# \ to toggle between 2D & 3D views and setup layers for each<br>
+# b to toggle between 2D & 3D views with the full 3D label visible<br>
+# \ to toggle between 2D & 3D views and setup plane cut view layers<br>
 # ' to switch to erase mode<br>
 # ; to switch to pan & zoom mode<br>
 # , to toggle 3d plane precision erase mode<br>
-# 
+# o to create off-axis plane cut in 3d mode (can also hold down to adjust)<br>
+# shift + click to move the 3d volume plane quickly<br>
+# shift + right click + drag up or down to 'fisheye' the view, useful to zoom into structures<br>
+
 # i to erode labels 1 iteration<br>
 # u to dilate labels 1 iteration<br>
 # j to toggle context padding data<br>
 # c to run connected components analysis and relabel<br>
 # f or down arrow for 20 iteration flood fill<br>
 # g or up arrow for 100 iteration flood fill<br>
-# 
+
 # h to save data & labels as nrrd files<br>
-# 
+
+# v to toggle compressed region class brush<br>
 # q to decrease brush size<br>
 # e to increase brush size<br>
 # w to select label layer that was last clicked in move mode, alternatively use color picker (4)<br>
@@ -285,43 +289,6 @@ prev_plane_info_var = None
 # Persistent variables to store the previous state and mask
 previous_label_3d_data = None
 manual_changes_mask = None
-
-# def erode_dilate_labels(data, erode=True, erosion_iterations=1, dilation_iterations=1):
-#     unique_values = np.unique(data[(data > 0) & (data < 254)])  # Ignore background, masking, and values of 254 and higher
-#     # Create an empty array for the result
-#     result = np.zeros_like(data, dtype=np.uint8)
-    
-#     for value in unique_values:
-#         structure_mask = data == value
-#         if erode:
-            
-#             # Pad the structure mask to prevent erosion at the edges
-#             padded_structure = np.pad(structure_mask, pad_width=erosion_iterations, mode='constant', constant_values=value)
-            
-#             # Erode the padded structure
-#             eroded_padded_structure = binary_erosion(padded_structure, iterations=erosion_iterations)
-            
-#             # Remove the padding after erosion
-#             eroded_structure = eroded_padded_structure[
-#                 erosion_iterations:-erosion_iterations,
-#                 erosion_iterations:-erosion_iterations,
-#                 erosion_iterations:-erosion_iterations
-#             ]
-            
-#             # Ensure the eroded structure is within bounds
-#             if eroded_structure.shape != structure_mask.shape:
-#                 eroded_structure = np.zeros_like(structure_mask)
-#             result[eroded_structure] = value
-#         else:
-#             if dilation_iterations > 0:
-#                 # Dilate the original structure bounded by the original mask
-#                 dilation_mask = original_label_data != 0
-#                 dilated_structure = binary_dilation(structure_mask, iterations=dilation_iterations)
-#                 dilated_structure = dilated_structure & dilation_mask
-#             else:
-#                 dilated_structure = structure_mask
-#             result[dilated_structure] = value  
-#     return result
 
 def process_value(value, data, erode, erosion_iterations, dilation_iterations, original_label_data):
     structure_mask = data == value
@@ -684,7 +651,7 @@ def connected_components(viewer):
     msg = 'connected components'
     viewer.status = msg
     print(msg)
-    msg = "DANGER Are you sure you want to run connected components? This operation cannot be undone and removes the undo queue. Consider saving first. IF YOU HAVE DILATED SEPERATED LABELS AND THEY NOW TOUCH, THEY WILL BE COMBINED."
+    msg = "DANGER Are you sure you want to run connected components? This operation cannot be undone and removes the undo queue. Consider saving first. \n\nIF YOU HAVE DILATED SEPERATED LABELS AND THEY NOW TOUCH, THEY WILL BE COMBINED."
     response = confirm_popup(msg)
     if response != QMessageBox.Yes:
             return 
@@ -897,10 +864,10 @@ def toggle_padding_context():
 def cut_label_at_plane_gui():
     cut_label_at_oblique_plane(viewer)
 
-def connected_components():
+def run_connected_components():
     connected_components(viewer)
 
-def save_labels():
+def save_labels_button():
     save_labels(viewer)
 
 # Create custom button widgets
@@ -909,9 +876,9 @@ erode_button = CustomButtonWidget("Erode Labels", "i", erode_labels)
 full_view_button = CustomButtonWidget("Toggle Full Label View", "b", toggle_full_label_view)
 plane_cut_button = CustomButtonWidget("Toggle 3D Plane Cut View", "\\", toggle_3D_plane_cut_view)
 padding_button = CustomButtonWidget("Toggle Padding Context", "j", toggle_padding_context)
-cut_plane_button = CustomButtonWidget("Cut Label at Plane", "k", cut_label_at_plane)
-components_button = CustomButtonWidget("Connected Components", "c", connected_components)
-save_button = CustomButtonWidget("Save Labels", "h", save_labels)
+cut_plane_button = CustomButtonWidget("Cut Label at Plane", "k", cut_label_at_plane_gui)
+components_button = CustomButtonWidget("Connected Components", "c", run_connected_components)
+save_button = CustomButtonWidget("Save Labels", "h", save_labels_button)
 
 # Create a container widget
 container_widget = QWidget()
