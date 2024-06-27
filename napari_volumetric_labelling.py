@@ -310,7 +310,7 @@ def erode_dilate_labels(data, erode=True, erosion_iterations=1, dilation_iterati
             result[eroded_structure] = value
         else:
             if dilation_iterations > 0:
-                # Dilate the original structure
+                # Dilate the original structure bounded by the original mask
                 dilation_mask = original_label_data != 0
                 dilated_structure = binary_dilation(structure_mask, iterations=dilation_iterations)
                 dilated_structure = dilated_structure & dilation_mask
