@@ -684,7 +684,7 @@ def connected_components(viewer):
     msg = 'connected components'
     viewer.status = msg
     print(msg)
-    msg = "Are you sure you want to run connected components? This operation cannot be undone and removes the undo queue."
+    msg = "DANGER Are you sure you want to run connected components? This operation cannot be undone and removes the undo queue. Consider saving first. IF YOU HAVE DILATED SEPERATED LABELS AND THEY NOW TOUCH, THEY WILL BE COMBINED."
     response = confirm_popup(msg)
     if response != QMessageBox.Yes:
             return 
