@@ -45,7 +45,7 @@ b to toggle between 2D & 3D views with the full 3D label visible<br>
 , to toggle 3d plane precision erase mode<br>
 o to create off-axis plane cut in 3d mode (can also hold down to adjust)<br>
 shift + click to move the 3d volume plane quickly<br>
-shift + right click + drag up or down to 'fisheye' the view, useful to zoom into structures<br>
+shift + right click + drag up or down to 'fisheye' the view, useful to zoom into structures, note that erase etc doesnt work in this mode :(<br>
 
 i to erode labels 1 iteration<br>
 u to dilate labels 1 iteration<br>
