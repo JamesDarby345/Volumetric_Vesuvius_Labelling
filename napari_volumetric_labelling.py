@@ -7,12 +7,10 @@ import blosc2
 from helper import *
 from napari.layers import Image
 from scipy.ndimage import binary_dilation, binary_erosion, binary_closing
-from qtpy.QtWidgets import QMessageBox,QPushButton, QLabel, QHBoxLayout, QVBoxLayout, QWidget
+from qtpy.QtWidgets import QSizePolicy,QMessageBox,QPushButton, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QScrollArea
 from qtpy.QtCore import QTimer, Qt
 from magicgui import magicgui
 from magicgui.widgets import Container
-# from concurrent.futures import ProcessPoolExecutor, as_completed
-# from napari.qt.threading import thread_worker
 from napari.qt.threading import thread_worker
 from napari.utils.notifications import show_info
 
@@ -68,38 +66,38 @@ if bright_spot_masking:
     print(np.max(bright_spot_mask_arr  ))
     label_data[bright_spot_mask_arr] = 0
 
-# ## Custom Napari Keybinds:<br>
-# / or r to toggle label visibility<br>
-# . or t to toggle data visibility<br>
-# Left & Right arrow keys scrub through layers in 2D & 3D planes<br>
-# k to cut label at 3D plane location, toggles displayed side of cut<br>
-# l to switch active layer to data layer (useful to move 3d plane with shift click)<br>
-# b to toggle between 2D & 3D views with the full 3D label visible<br>
-# \ to toggle between 2D & 3D views and setup plane cut view layers<br>
-# ' to switch to erase mode<br>
-# ; to switch to pan & zoom mode<br>
-# , to toggle 3d plane precision erase mode<br>
-# o to create off-axis plane cut in 3d mode (can also hold down to adjust)<br>
-# shift + click to move the 3d volume plane quickly<br>
-# shift + right click + drag up or down to 'fisheye' the view, useful to zoom into structures<br>
-
-# i to erode labels 1 iteration<br>
-# u to dilate labels 1 iteration<br>
-# j to toggle context padding data<br>
-# c to run connected components analysis and relabel<br>
-# f or down arrow for 20 iteration flood fill<br>
-# g or up arrow for 100 iteration flood fill<br>
-
-# h to save data & labels as nrrd files<br>
-
-# v to toggle compressed region class brush<br>
-# q to decrease brush size<br>
-# e to increase brush size<br>
-# w to select label layer that was last clicked in move mode, alternatively use color picker (4)<br>
-# s to toggle show selected label<br>
-# a to move through layers in 2d<br>
-# d to move through layers in 2d<br>
-# x to extrapolate sparse compressed class labels<br>
+instruction_text = """
+<b>Custom Napari Keybinds:</b><br>
+- <b>/ or r</b> to toggle label visibility<br>
+- <b>. or t</b> to toggle data visibility<br>
+- <b>Left & Right arrow keys</b> move through layers<br>
+- <b>Shift + Left & Right arrow keys</b> move 20 layers<br>
+- <b>k</b> to cut label at 3D plane location<br>
+- <b>l</b> to switch active layer to data layer <br>
+- <b>b</b> to toggle full 3D label view<br>
+- <b>\\</b> to toggle 3D plane cut view layers<br>
+- <b>'</b> to switch to erase mode<br>
+- <b>;</b> to switch to pan & zoom mode<br>
+- <b>,</b> to toggle 3d plane precision erase mode<br>
+- <b>o</b> to create off-axis plane cut in 3d mode <br>
+- <b>shift + click</b> to move the 3d volume plane quickly<br>
+- <b>shift + right click + drag up or down</b> to 'fisheye' the view<br>\n
+- <b>i</b> to erode labels 1 iteration<br>
+- <b>u</b> to dilate labels 1 iteration<br>
+- <b>j</b> to toggle context padding data<br>
+- <b>c</b> to run connected components analysis and relabel<br>
+- <b>f or down arrow</b> for 20 iteration flood fill<br>
+- <b>g or up arrow</b> for 100 iteration flood fill<br>
+- <b>h</b> to save data & labels as nrrd files<br>\n
+- <b>v</b> to toggle compressed region class brush<br>
+- <b>q</b> to decrease brush size<br>
+- <b>e</b> to increase brush size<br>
+- <b>w</b> to select label layer under cursor<br>
+- <b>s</b> to toggle show selected label<br>
+- <b>a</b> to move through layers in 2d<br>
+- <b>d</b> to move through layers in 2d<br>
+- <b>x</b> to extrapolate sparse compressed class labels<br>
+"""
 
 # Initialize the Napari viewer
 viewer = napari.Viewer()
@@ -895,18 +893,52 @@ cut_plane_button = CustomButtonWidget("Cut Label at Plane", "k", cut_label_at_pl
 components_button = CustomButtonWidget("Connected Components", "c", run_connected_components)
 save_button = CustomButtonWidget("Save Labels", "h", save_labels_button)
 
-# Create a container widget
-container_widget = QWidget()
-container_layout = QVBoxLayout()
-container_widget.setLayout(container_layout)
+# Create a container widget for buttons
+button_container_widget = QWidget()
+button_container_layout = QVBoxLayout()
+button_container_widget.setLayout(button_container_layout)
 
 # Add buttons to the container
 for button in [dilate_button, erode_button, full_view_button, plane_cut_button, 
                 cut_plane_button, padding_button, components_button, save_button]:
-    container_layout.addWidget(button)
+    button_container_layout.addWidget(button)
 
-# Add the container to the viewer
-viewer.window.add_dock_widget(container_widget, area='right')
+# Create a container widget for the instruction text with scrollable area
+text_container_widget = QWidget()
+text_container_layout = QVBoxLayout()
+text_container_widget.setLayout(text_container_layout)
+
+instruction_label = QLabel(instruction_text)
+instruction_label.setWordWrap(True)
+instruction_label.setAlignment(Qt.AlignmentFlag.AlignTop)
+text_container_layout.addWidget(instruction_label)
+
+# Add the text container to a scroll area
+scroll_area = QScrollArea()
+scroll_area.setWidgetResizable(True)
+scroll_area.setWidget(text_container_widget)
+
+# Create a main container widget to hold both button and text containers
+main_container_widget = QWidget()
+main_container_layout = QVBoxLayout()
+main_container_widget.setLayout(main_container_layout)
+
+# Adjust size policies and layout properties
+main_container_widget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Maximum)
+main_container_layout.setContentsMargins(0, 0, 0, 0)
+main_container_layout.setSpacing(5)
+
+# Add button container to the main container
+main_container_layout.addWidget(button_container_widget)
+
+# Add the main container to the viewer
+viewer.window.add_dock_widget(main_container_widget, area='right')
+
+# Add the scroll area to the viewer as a separate dock widget
+viewer.window.add_dock_widget(scroll_area, area='right')
+
+
+
 # Default napari settings for Vesuvius Volumetric Labeling
 viewer.axes.visible = True
 labels_layer.n_edit_dimensions = 3
