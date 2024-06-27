@@ -14,6 +14,11 @@ from magicgui.widgets import Container
 from napari.qt.threading import thread_worker
 from napari.utils.notifications import show_info
 from napari.utils.colormaps import colormap_utils, label_colormap, DirectLabelColormap
+from napari.utils.key_bindings import KeymapProvider
+from vispy.app import KeyEvent, MouseEvent
+from vispy.scene import SceneCanvas
+from napari.utils.interactions import mouse_press_callbacks, mouse_move_callbacks, mouse_release_callbacks
+
 
 
 # Data location and size parameters
@@ -899,6 +904,9 @@ for button in [dilate_button, erode_button, full_view_button, plane_cut_button,
                 cut_plane_button, padding_button, components_button, save_button]:
     button_container_layout.addWidget(button)
 
+color_picker_widget = ColorPickerWidget(viewer)
+button_container_layout.addWidget(color_picker_widget)
+
 # Create a container widget for the instruction text with scrollable area
 text_container_widget = QWidget()
 text_container_layout = QVBoxLayout()
@@ -940,7 +948,7 @@ labels_layer.n_edit_dimensions = 3
 labels_layer.opacity = 1
 labels_layer.contour = 1
 viewer.theme = 'light'
-viewer.window._qt_viewer.canvas.bgcolor = 'white'
+viewer.window._qt_viewer.canvas.bgcolor = (0.68, 0.85, 0.90, 1.0)
 # viewer.layers[label_name].colormap = 'viridis'
 
 
@@ -949,8 +957,8 @@ labels_layer.shape = 'square'
 
 viewer.layers.selection.active = viewer.layers[label_name]
 
-camera = viewer.window.qt_viewer.view.camera
-camera.angles = (90, 180, 0)
+# camera = viewer.window.qt_viewer.view.camera
+# camera.angles = (90, 180, 0)
 # Start the Napari event loop
 napari.run()
 
