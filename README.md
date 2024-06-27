@@ -33,18 +33,19 @@ Search for Change to find path location variables to change to point to raw and 
 Optionally search for 'keybind' in the notebook to change the keys certain custom functions are mapped to. Note that keys like x,y,z,[,],-,= have default Napari mappings and may not work in all modes.
 
 ## Custom Napari Keybinds:<br>
-v to toggle compressed region class brush<br>
 / or r to toggle label visibility<br>
 . or t to toggle data visibility<br>
 Left & Right arrow keys scrub through layers in 2D & 3D planes<br>
 k to cut label at 3D plane location, toggles displayed side of cut<br>
 l to switch active layer to data layer (useful to move 3d plane with shift click)<br>
-\ to toggle between 2D & 3D views and setup layers for each<br>
+b to toggle between 2D & 3D views with the full 3D label visible<br>
+\ to toggle between 2D & 3D views and setup plane cut view layers<br>
 ' to switch to erase mode<br>
 ; to switch to pan & zoom mode<br>
 , to toggle 3d plane precision erase mode<br>
 o to create off-axis plane cut in 3d mode (can also hold down to adjust)<br>
 shift + click to move the 3d volume plane quickly<br>
+shift + right click + drag up or down to 'fisheye' the view, useful to zoom into structures<br>
 
 i to erode labels 1 iteration<br>
 u to dilate labels 1 iteration<br>
@@ -55,6 +56,7 @@ g or up arrow for 100 iteration flood fill<br>
 
 h to save data & labels as nrrd files<br>
 
+v to toggle compressed region class brush<br>
 q to decrease brush size<br>
 e to increase brush size<br>
 w to select label layer that was last clicked in move mode, alternatively use color picker (4)<br>
