@@ -1,0 +1,29 @@
+customizable_hotkeys:
+  toggle_labels_visibility: ["/", "r"]
+  toggle_data_visibility: [".", "t"]
+  on_left_arrow_event: "Left"
+  on_right_arrow_event: "Right"
+  on_left_arrow_event: "Shift+Left"  # Note: This is the same function as "Left"
+  on_right_arrow_event: "Shift+Right"  # Note: This is the same function as "Right"
+  cut_label_at_oblique_plane: "k"
+  switch_to_data_layer: "l"
+  full_label_view: "b"
+  switch_to_plane: "\\"
+  erase_3d_mode: "'"
+  move_mode: ";"
+  erase_3d_mode: ","  # Note: This is the same function as "'"
+  erode_labels: "i"
+  dilate_labels: "u"
+  add_padding_contextual_data: "j"
+  connected_components: "c"
+  flood_fill: ["f", "Down"]
+  on_g_event: ["g", "Up"]
+  save_labels: "h"
+  draw_compressed_class: "v"
+  decrease_brush_size: "q"
+  increase_brush_size: "e"
+  on_w_key: "w"
+  toggle_show_selected_label: "s"
+  start_left_timer: "a"
+  start_right_timer: "d"
+  interpolate_borders: "x"

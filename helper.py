@@ -67,24 +67,6 @@ def confirm_popup(message):
     msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
     return msg.exec_()
 
-def generate_distinct_colors(n):
-    if n < 1:
-        return []
-    
-    colors = ['#FFFF00']  # Yellow for the first color
-    
-    if n > 1:
-        colors.append('#00FF00')  # Green for the second color
-    
-    if n > 2:
-        # Generate distinct colors for the remaining n-2 colors
-        HSV_tuples = [(x * 1.0 / (n-2), 0.5, 0.5) for x in range(n-2)]
-        RGB_tuples = [colorsys.hsv_to_rgb(*x) for x in HSV_tuples]
-        additional_colors = ['#%02x%02x%02x' % tuple(int(255*y) for y in x) for x in RGB_tuples]
-        colors.extend(additional_colors)
-    
-    return colors
-
 def get_padded_nrrd_data(folder_path, original_coords, pad_amount, chunk_size=256):
     z, y, x = original_coords
     padded_raw_data = None

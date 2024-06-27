@@ -15,8 +15,8 @@ from magicgui.widgets import Container
 from napari.qt.threading import thread_worker
 from napari.utils.notifications import show_info
 from napari.utils.interactions import mouse_press_callbacks, mouse_move_callbacks, mouse_release_callbacks
-
-
+import yaml
+from pathlib import Path
 
 # Data location and size parameters
 scroll_name = 's1'
