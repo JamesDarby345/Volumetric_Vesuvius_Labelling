@@ -140,7 +140,14 @@ class VesuviusGUI:
         print(f"Erase width updated to: {self.erase_slice_width}")
 
     def setup_napari_defaults(self):
+        viewer = self.viewer
+        label_name = 'Labels'
+        data_name = 'Data'
+        compressed_name = 'Compressed Regions'
+        ff_name = 'flood_fill_layer'
+        label_3d_name = '3D Label Edit Layer'
         self.viewer.axes.visible = True
+        self.viewer.dims.ndisplay = 3
         labels_layer = self.viewer.layers[self.get_label_layer_name()]
         labels_layer.n_edit_dimensions = 3
         labels_layer.opacity = 1
@@ -151,6 +158,28 @@ class VesuviusGUI:
         labels_layer.colormap = get_direct_label_colormap()
         labels_layer.shape = 'square'
         self.viewer.layers.selection.active = labels_layer
+        # Prep layers visibility and blending
+        step_val = viewer.dims.current_step
+        for layer in viewer.layers:
+            
+            if layer.name != data_name and layer.name != ff_name and layer.name != label_name and layer.name != label_3d_name:
+                viewer.layers[layer.name].visible = False
+            elif layer.name == label_name:
+                if label_3d_name in viewer.layers:
+                    viewer.layers[label_3d_name].visible = True
+                    viewer.layers[label_3d_name].blending = 'opaque'
+                    viewer.layers[layer.name].visible = False
+                else:
+                    viewer.layers[layer.name].visible = True
+                    viewer.layers[layer.name].blending = 'opaque'
+            elif layer.name == data_name:
+                # Change the depiction of `data_name` layer from volume to plane
+                viewer.layers[layer.name].visible = True
+                viewer.layers[layer.name].depiction = 'plane'
+                viewer.layers[layer.name].plane.position = (step_val[0], 0, 0)
+                viewer.layers[layer.name].affine = np.eye(3)  # Ensure the affine transform is identity for proper rendering
+                viewer.layers[layer.name].blending = 'opaque'
+                viewer.layers.selection.active = viewer.layers[layer.name]
 
     # Define button callback methods
     def dilate_labels_gui(self):

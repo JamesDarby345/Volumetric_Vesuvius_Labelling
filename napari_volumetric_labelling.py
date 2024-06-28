@@ -101,6 +101,7 @@ compressed_class = 254
 pad_state = False
 erase_mode = False
 cut_side = True
+plane_shift_status = False
 eraser_size = 4
 
 global erase_slice_width
@@ -274,6 +275,7 @@ def large_flood_fill(viewer):
 
 # Variable to store the previous oblique plane information
 prev_plane_info_var = None
+prev_erase_plane_info_var = None
 
 # Persistent variables to store the previous state and mask
 previous_label_3d_data = None
@@ -344,7 +346,19 @@ def erode_dilate_labels(viewer, data, erode=True, erosion_iterations=1, dilation
     worker.returned.connect(on_complete)
     worker.start()
 
+def shift_prev_erase_plane(direction):
+    global erase_slice_width, prev_erase_plane_info_var
+    if prev_erase_plane_info_var is not None:
+        current_position = np.array(prev_erase_plane_info_var['position'])
+        normal_vector = np.array(prev_erase_plane_info_var['normal'])
+        normal_vector /= np.linalg.norm(normal_vector)
+        new_position = current_position + direction * normal_vector
+        prev_erase_plane_info_var['position'] = new_position
+
+        
 def shift_plane(layer, direction, padding_mode=False, padding=50):
+    global plane_shift_status
+    plane_shift_status = True
     if isinstance(layer, Image) and viewer.dims.ndisplay == 3 and layer.depiction == 'plane':
         # Get the current position and normal of the plane
         current_position = np.array(layer.plane.position)
@@ -448,17 +462,21 @@ def switch_to_plane(viewer):
                 viewer.layers.selection.active = viewer.layers[layer.name]
 
 def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=None):
-    global previous_label_3d_data, manual_changes_mask, prev_plane_info_var, erase_slice_width, brush_size
-
+    global previous_label_3d_data, manual_changes_mask, prev_plane_info_var, erase_slice_width, brush_size, plane_shift_status
+    plane_shift_status = False
     data_plane = viewer.layers[data_name]
     if data_plane.depiction != 'plane':
         print("Please switch to plane mode by pressing '\\' key.")
         return
 
     active_mode = viewer.layers.selection.active.mode
+    #TODO: dig into if this is desired behaviour
     if prev_plane_info is not None:
         position = prev_plane_info['position']
         normal = prev_plane_info['normal']
+    elif erase_mode and prev_erase_plane_info_var is not None:
+        position = prev_erase_plane_info_var['position']
+        normal = prev_erase_plane_info_var['normal']
     else:
         position = np.array(data_plane.plane.position)
         normal = np.array(data_plane.plane.normal)
@@ -490,7 +508,6 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
 
     # Create a copy of the label data and set all voxels between the viewer and the plane to 0
     new_label_data = labels_layer.data.copy()
-    print(f"Cutting label data at plane: position = {position}, normal = {normal}, erase_mode = {erase_mode}, cut_side = {cut_side}")
     if cut_side:
         new_label_data[distances > 1.5] = 0
         if erase_mode:
@@ -524,15 +541,17 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     viewer.layers[label_3d_name].refresh()
 
 def plane_3d_erase_mode_shift_left(viewer):
-    global erase_mode
+    global erase_mode, prev_erase_plane_info_var
     if erase_mode:
+        shift_prev_erase_plane(-erase_slice_width)
         shift_plane(viewer.layers[data_name], -erase_slice_width)
         if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
             cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
 def plane_3d_erase_mode_shift_right(viewer):
-    global erase_mode
+    global erase_mode, prev_erase_plane_info_var
     if erase_mode:
+        shift_prev_erase_plane(erase_slice_width)
         shift_plane(viewer.layers[data_name], erase_slice_width)
         if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
             cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
@@ -639,13 +658,16 @@ def erase_mode(viewer):
 #keybind , to enable the 3d slice erase mode
 #@viewer.bind_key(',')
 def plane_erase_3d_mode(viewer, switch=True):
-    global erase_mode, cut_side
+    global erase_mode, cut_side, plane_shift_status, prev_erase_plane_info_var
     if not erase_mode:
         switch = False
         erase_mode = True
-    if switch:
+    if switch and not plane_shift_status:
         cut_side = not cut_side
     if viewer.dims.ndisplay == 3 and viewer.layers[data_name].depiction == 'plane':
+        position = np.array(viewer.layers[data_name].plane.position)
+        normal = np.array(viewer.layers[data_name].plane.normal)
+        prev_erase_plane_info_var = {'position': position, 'normal': normal}
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
         viewer.layers[label_name].visible = False
 
@@ -660,11 +682,11 @@ def move_mode(viewer):
 # keybind k to cut the label layer at the oblique plane, also called by left and right arrow
 #@viewer.bind_key('k', overwrite=True)
 def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
-    global erase_mode, cut_side
+    global erase_mode, cut_side, plane_shift_status
     if erase_mode:
         switch = False
         erase_mode = False
-    if switch:
+    if switch and not plane_shift_status:
         cut_side = not cut_side
     if viewer.dims.ndisplay == 3 and viewer.layers[data_name].depiction == 'plane':
         cut_label_at_plane(viewer, erase_mode=False, cut_side=cut_side, prev_plane_info=prev_plane_info)
@@ -850,52 +872,6 @@ def save_labels(viewer):
     msg = f"Layers saved to {output_path}"
     show_popup(msg)
 
-# UI functions for the buttons
-# def dilate_labels_gui():
-#     dilate_labels(viewer, viewer.layers[label_name].data, erode=False)
-
-# def erode_labels_gui():
-#     erode_labels(viewer)
-
-# def toggle_full_label_view():
-#     full_label_view(viewer)
-
-# def toggle_3D_plane_cut_view():
-#     switch_to_plane(viewer)
-
-# def toggle_padding_context():
-#     add_padding_contextual_data(viewer)
-
-# def cut_label_at_plane_gui():
-#     cut_label_at_oblique_plane(viewer)
-
-# def run_connected_components():
-#     connected_components(viewer)
-
-# def save_labels_button():
-#     save_labels(viewer)
-
-# Create a dictionary of functions to pass to the GUI
-functions_dict = {
-    'erode_labels': erode_labels,
-    'dilate_labels': dilate_labels,
-    'full_label_view': full_label_view,
-    'switch_to_plane': switch_to_plane,
-    'add_padding_contextual_data': add_padding_contextual_data,
-    'cut_label_at_oblique_plane': cut_label_at_oblique_plane,
-    'connected_components': connected_components,
-    'save_labels': save_labels,
-}
-
-def update_global_erase_slice_width(value):
-    global erase_slice_width
-    erase_slice_width = value
-    print(f"Global erase width updated to: {erase_slice_width}")
-
-# Create the GUI
-gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotkey_config)
-gui.setup_napari_defaults()
-
 def bind_hotkeys(viewer, config, module=None, overwrite=True):
     if module is None:
         module = sys.modules['__main__']  # Get the main module
@@ -929,7 +905,45 @@ def bind_hotkeys(viewer, config, module=None, overwrite=True):
             except (ValueError, TypeError) as e:
                 print(f"Error binding key '{keys}' to function '{func_name}': {str(e)}")
 
+def set_corner_view(viewer):
+    center = (chunk_size // 2, chunk_size // 2, chunk_size // 2)
+    # Calculate azimuth and elevation
+    # Set the camera properties
+    viewer.camera.center = center
+    viewer.camera.angles = (-10,30,65)  # Setting roll to 0
+    
+    # Adjust zoom to fit the view
+    viewer.camera.zoom = 1.8  # You may need to adjust this value
+
+def print_camera_info(viewer):
+    camera = viewer.camera
+    print(f"Center: {camera.center}")
+    print(f"Angles: {camera.angles}")
+    print(f"Zoom: {camera.zoom}")
+
+# Create a dictionary of functions to pass to the GUI
+functions_dict = {
+    'erode_labels': erode_labels,
+    'dilate_labels': dilate_labels,
+    'full_label_view': full_label_view,
+    'switch_to_plane': switch_to_plane,
+    'add_padding_contextual_data': add_padding_contextual_data,
+    'cut_label_at_oblique_plane': cut_label_at_oblique_plane,
+    'connected_components': connected_components,
+    'save_labels': save_labels,
+}
+
+def update_global_erase_slice_width(value):
+    global erase_slice_width
+    erase_slice_width = value
+    print(f"Global erase width updated to: {erase_slice_width}")
+
+# Create the GUI
+gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotkey_config)
+gui.setup_napari_defaults()
+
 bind_hotkeys(viewer, hotkey_config)
+set_corner_view(viewer)
 
 # Start the Napari event loop
 napari.run()

@@ -1,8 +1,8 @@
 cube_info:
 #cube z,y,x coords to load correct raw data & mask cubes
-  z: 7632
-  y: 2768
-  x: 5072
+  z: 7376
+  y: 3024
+  x: 4048
   scroll_name: 's1'
   chunk_size: 256
   pad_amount: 100
@@ -16,8 +16,8 @@ cube_info:
 customizable_hotkeys:
   erase_mode: ["w"]
   move_mode: ["s"]
-  toggle_labels_visibility: ["Shift-w","/", "r"]
-  toggle_data_visibility: ["Shift-s",".", "f"]
+  toggle_labels_visibility: ["Shift-s","/", "r"]
+  toggle_data_visibility: ["Shift-w",".", "f"]
   #------------------------
   #arrow keys have 2d default behaviour, these extend behaviour to 3d plane shifting
   shift_data_left_and_recut_3d_label: ["Left","Shift-q"]
@@ -59,4 +59,6 @@ customizable_hotkeys:
   increase_brush_size: "Shift-x"
   label_picker: ""
   toggle_show_selected_label: ""
-  interpolate_borders: "m"
+  interpolate_borders: ""
+  set_corner_view: ""
+  print_camera_info: "m"
