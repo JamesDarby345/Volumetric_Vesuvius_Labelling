@@ -1,3 +1,14 @@
+cube_info:
+#cube z,y,x coords to load correct raw data & mask cubes
+  z: 7632
+  y: 2768
+  x: 5072
+  scroll_name: 's1'
+  chunk_size: 256
+  pad_amount: 100
+  brush_size: 4
+  use_zarr: False #True if using zarr for raw data instead of nrrd cubes, will still need nrrd mask cubes
+  zarr_path: 'full/path/to/file.zarr'
 #Napari default keybinds will overwrite the custom keybinds in some modes
 #Thus, it is recommended to not use the default keybinds for custom keybinds
 #Keys with default functions include:
@@ -44,8 +55,8 @@ customizable_hotkeys:
   connected_components: "'"
   save_labels: "h"
   draw_compressed_class: "b"
-  decrease_brush_size: ""
-  increase_brush_size: ""
+  decrease_brush_size: "Shift-z"
+  increase_brush_size: "Shift-x"
   label_picker: ""
   toggle_show_selected_label: ""
   interpolate_borders: "m"

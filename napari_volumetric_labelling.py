@@ -19,47 +19,54 @@ import yaml
 from pathlib import Path
 import sys
 
-def read_hotkey_config(config_path='napari_config.yaml'):
+def read_config(config_path='napari_config.yaml'):
     config_path = Path(config_path)
     if config_path.exists():
         with open(config_path, 'r') as file:
             config = yaml.safe_load(file)
-            return config.get('customizable_hotkeys', {})
+            return config.get('cube_info',{}), config.get('customizable_hotkeys', {})
     return {}
 
-config = read_hotkey_config()
+cube_info, hotkey_config = read_config()
 
 # Data location and size parameters
-scroll_name = 's1'
-z = 7632
-y = 2768
-x = 5072
-chunk_size = 256
-pad_amount = 100
+scroll_name = cube_info.get('scroll_name', "")
+z = cube_info.get('z', 0)
+y = cube_info.get('y', 0)
+x = cube_info.get('x', 0)
+chunk_size = cube_info.get('chunk_size', 256)
+pad_amount = cube_info.get('pad_amount', 100)
+brush_size = cube_info.get('brush_size', 4)
+
 current_directory = os.getcwd()
 pad_state = False
 padded_raw_data = []
 
-#nrrd zyx coord cubes
+use_zarr = cube_info.get('use_zarr', False)
+raw_data = None 
+data = None
+
 nrrd_cube_path = os.path.join(current_directory, 'data/nrrd_cubes') #Change to the path of the folder containing the nrrd cubes
-raw_data, _ = nrrd.read(nrrd_cube_path+f'/volume_{z}_{y}_{x}.nrrd')
 original_label_data, _ = nrrd.read(nrrd_cube_path+f'/mask_{z}_{y}_{x}.nrrd')
-padded_raw_data = get_padded_nrrd_data(nrrd_cube_path, (z, y, x), pad_amount)
-
 label_data = original_label_data
-data = raw_data
 
-# # #---Multi Res Zarr specific code, comment out if not using---
-# zarr_path = "/Volumes/16TB_RAID_0/Scroll1/Scroll1.zarr" #Change this to the path of the zarr file if using zarr
-# # zarr_path = "/Volumes/16TB_RAID_0/Scroll2/Scroll2.zarr"
-# zarr_multi_res = zarr.open(zarr_path, mode='r')
-# zarr = zarr_multi_res[0]
+#nrrd zyx coord cubes
+if not use_zarr:
+    raw_data, _ = nrrd.read(nrrd_cube_path+f'/volume_{z}_{y}_{x}.nrrd')
+    padded_raw_data = get_padded_nrrd_data(nrrd_cube_path, (z, y, x), pad_amount)
+    data = raw_data
+else:
+    #use zarr is true
+    zarr_path = cube_info.get('zarr_path', "") #Change this to the path of the zarr file if using zarr
+    zarr_multi_res = zarr.open(zarr_path, mode='r')
+    zarr = zarr_multi_res[0]
 
-# raw_data = zarr[z:z+chunk_size, y:y+chunk_size, x:x+chunk_size]
+    raw_data = zarr[z:z+chunk_size, y:y+chunk_size, x:x+chunk_size]
 
-# #Note: will crash if out of bounds and not checking at the moment
-# padded_raw_data = zarr[z-pad_amount:z+chunk_size+pad_amount, y-pad_amount:y+chunk_size+pad_amount, x-pad_amount:x+chunk_size+pad_amount]
-# data = raw_data
+    #Note: will crash if out of bounds and not checking at the moment
+    padded_raw_data = zarr[z-pad_amount:z+chunk_size+pad_amount, y-pad_amount:y+chunk_size+pad_amount, x-pad_amount:x+chunk_size+pad_amount]
+    data = raw_data
+
 
 # # Jordi's gross volumetric labels from blosc2
 # file_path = os.path.join(current_directory, 'data/s1_gross_labels.b2nd') #Change this to the path of the blosc2 file if using blosc2 labels
@@ -156,10 +163,6 @@ def toggle_data_visibility(viewer):
     viewer.status = msg
     print(msg)
     image_layer.visible = not image_layer.visible
-    if label_3d_name in viewer.layers and not image_layer.visible:
-        viewer.layers[label_3d_name].blending = 'minimum'
-    elif label_3d_name in viewer.layers and image_layer.visible:
-        viewer.layers[label_3d_name].blending = 'opaque'
 
 #keybind t alt to toggle the data layer visibility
 # viewer.bind_key('t', toggle_data_visibility)
@@ -167,18 +170,30 @@ def toggle_data_visibility(viewer):
 #keybind q to decrease the brush size of the labels layer
 #@viewer.bind_key('q')
 def decrease_brush_size(viewer):
+    global brush_size
     msg = 'decrease brush size'
     viewer.status = msg
     print(msg)
-    labels_layer.brush_size = labels_layer.brush_size - 1
+    if label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+        viewer.layers[label_3d_name].brush_size = viewer.layers[label_3d_name].brush_size - 1
+        brush_size = viewer.layers[label_3d_name].brush_size
+    else:
+        labels_layer.brush_size = labels_layer.brush_size - 1
+        brush_size = labels_layer.brush_size
 
 #keybind e to increase the brush size of the labels layer
 #@viewer.bind_key('e')
 def increase_brush_size(viewer):
+    global brush_size
     msg = 'increase brush size'
     viewer.status = msg
     print(msg)
-    labels_layer.brush_size = labels_layer.brush_size + 1
+    if label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+        viewer.layers[label_3d_name].brush_size = viewer.layers[label_3d_name].brush_size + 1
+        brush_size = viewer.layers[label_3d_name].brush_size
+    else:
+        labels_layer.brush_size = labels_layer.brush_size + 1
+        brush_size = labels_layer.brush_size
 
 #keybind s to toggle the show selected label only mode
 #@viewer.bind_key('s')
@@ -354,7 +369,10 @@ def shift_plane(layer, direction, padding_mode=False, padding=50):
     elif viewer.dims.ndisplay == 2:
         # If in 2D mode, shift the slice by 1
         current_step = viewer.dims.current_step[0]
-        new_step = current_step + direction
+        if padding_mode:
+            new_step = current_step + padding
+        else:
+            new_step = current_step + direction
         viewer.dims.set_current_step(0, new_step)
         print(f"Shifted 2D slice to: {new_step}")
     else:
@@ -430,7 +448,7 @@ def switch_to_plane(viewer):
                 viewer.layers.selection.active = viewer.layers[layer.name]
 
 def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=None):
-    global previous_label_3d_data, manual_changes_mask, prev_plane_info_var, erase_slice_width
+    global previous_label_3d_data, manual_changes_mask, prev_plane_info_var, erase_slice_width, brush_size
 
     data_plane = viewer.layers[data_name]
     if data_plane.depiction != 'plane':
@@ -486,7 +504,6 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     visible_state = True
     if label_3d_name in viewer.layers:
         visible_state = viewer.layers[label_3d_name].visible
-        
         viewer.layers.remove(viewer.layers[label_3d_name])
     
     # Add a new label layer with the updated data
@@ -497,6 +514,7 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     new_label_layer.visible = visible_state
     new_label_layer.blending = 'opaque'
     new_label_layer.mode = active_mode
+    new_label_layer.brush_size = brush_size
 
     # Store the current state of the label_3d_name layer for future comparison
     previous_label_3d_data = new_label_data.copy()
@@ -875,7 +893,7 @@ def update_global_erase_slice_width(value):
     print(f"Global erase width updated to: {erase_slice_width}")
 
 # Create the GUI
-gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, config)
+gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotkey_config)
 gui.setup_napari_defaults()
 
 def bind_hotkeys(viewer, config, module=None, overwrite=True):
@@ -911,9 +929,7 @@ def bind_hotkeys(viewer, config, module=None, overwrite=True):
             except (ValueError, TypeError) as e:
                 print(f"Error binding key '{keys}' to function '{func_name}': {str(e)}")
 
-bind_hotkeys(viewer, config)
+bind_hotkeys(viewer, hotkey_config)
 
 # Start the Napari event loop
 napari.run()
-
-
