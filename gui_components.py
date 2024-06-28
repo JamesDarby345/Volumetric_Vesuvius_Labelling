@@ -145,6 +145,7 @@ class VesuviusGUI:
         labels_layer.n_edit_dimensions = 3
         labels_layer.opacity = 1
         labels_layer.contour = 1
+        labels_layer.brush_size = 4
         self.viewer.theme = 'light'
         self.viewer.window._qt_viewer.canvas.bgcolor = (0.68, 0.85, 0.90, 1.0)
         labels_layer.colormap = get_direct_label_colormap()
@@ -183,10 +184,10 @@ class VesuviusGUI:
                 'Right': 'Right Arrow',
                 'Up': 'Up Arrow',
                 'Down': 'Down Arrow',
-                'Shift-Left': 'Shift + Left Arrow',
-                'Shift-Right': 'Shift + Right Arrow',
-                'Shift-Up': 'Shift + Up Arrow',
-                'Shift-Down': 'Shift + Down Arrow',
+                'Shift-Left': 'Shift-Left Arrow',
+                'Shift-Right': 'Shift-Right Arrow',
+                'Shift-Up': 'Shift-Up Arrow',
+                'Shift-Down': 'Shift-Down Arrow',
             }
             return key_map.get(key, key)
 
@@ -206,14 +207,14 @@ class VesuviusGUI:
         # Function to get a string of keys for a function
         def get_key_string(func):
             keys = function_to_keys.get(func, [])
+            if not keys or keys == ['']:
+                return 'unassigned'
             return ' or '.join(f'<b>{key_to_string(key)}</b>' for key in keys if key)
 
         instruction_text = f"""
         <b>Custom Napari Keybinds:</b><br>
         - {get_key_string('toggle_labels_visibility')} to toggle label visibility<br>
         - {get_key_string('toggle_data_visibility')} to toggle data visibility<br>
-        - {get_key_string('shift_plane_left')} & {get_key_string('shift_plane_right')} to move through layers<br>
-        - {get_key_string('shift_plane_left_fast')} & {get_key_string('shift_plane_right_fast')} to move through layers faster<br>
         - {get_key_string('cut_label_at_oblique_plane')} to cut label at 3D plane location<br>
         - {get_key_string('switch_to_data_layer')} to switch active layer to data layer<br>
         - {get_key_string('full_label_view')} to toggle full 3D label view<br>
@@ -235,8 +236,6 @@ class VesuviusGUI:
         - {get_key_string('increase_brush_size')} to increase brush size<br>
         - {get_key_string('label_picker')} to select label layer under cursor<br>
         - {get_key_string('toggle_show_selected_label')} to toggle show selected label<br>
-        - {get_key_string('shift_dim_left')} to shift dimension left in 2D<br>
-        - {get_key_string('shift_dim_right')} to shift dimension right in 2D<br>
         - {get_key_string('interpolate_borders')} to extrapolate sparse compressed class labels<br>
         """
         return instruction_text

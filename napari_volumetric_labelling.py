@@ -133,7 +133,6 @@ def draw_compressed_class(viewer):
     viewer.status = msg
     print(msg)
     labels_layer.selected_label = compressed_class
-    # labels_layer.brush_size = 6
     labels_layer.mode = 'paint'
 
 #keybind r to toggle the labels layer visibility
@@ -498,7 +497,6 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     new_label_layer.visible = visible_state
     new_label_layer.blending = 'opaque'
     new_label_layer.mode = active_mode
-    # new_label_layer.brush_size = 4
 
     # Store the current state of the label_3d_name layer for future comparison
     previous_label_3d_data = new_label_data.copy()
@@ -511,23 +509,26 @@ def plane_3d_erase_mode_shift_left(viewer):
     global erase_mode
     if erase_mode:
         shift_plane(viewer.layers[data_name], -erase_slice_width)
+        if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+            cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
 def plane_3d_erase_mode_shift_right(viewer):
     global erase_mode
     if erase_mode:
         shift_plane(viewer.layers[data_name], erase_slice_width)
+        if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+            cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
 #keybind Left arrow  to shift the plane along the normal vector in 3d viewing mode
 #@viewer.bind_key('Left', overwrite=True)
-def shift_plane_left(viewer):
+def shift_data_left_and_recut_3d_label(viewer):
     global erase_mode, cut_side
-    
     shift_plane(viewer.layers[data_name], -1)
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
 #@viewer.bind_key('Shift-Left', overwrite=True)
-def shift_plane_left_fast(viewer):
+def shift_data_left_fast_and_recut_3d_label(viewer):
     global erase_mode, cut_side, erase_slice_width
     if erase_mode:
         shift_plane(viewer.layers[data_name], -erase_slice_width)
@@ -538,7 +539,7 @@ def shift_plane_left_fast(viewer):
 
 #keybind Right arrow to shift the plane along the normal vector in 3d viewing mode
 #@viewer.bind_key('Right', overwrite=True)
-def shift_plane_right(viewer):
+def shift_data_right_and_recut_3d_label(viewer):
     global erase_mode, cut_side
     shift_plane(viewer.layers[data_name], 1)
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
@@ -546,7 +547,7 @@ def shift_plane_right(viewer):
 
 #keybind Right arrow + shift to shift the plane along the normal vector 20 in 3d viewing mode
 #@viewer.bind_key('Shift-Right', overwrite=True)
-def shift_plane_right_fast(viewer):
+def shift_data_right_fast_and_recut_3d_label(viewer):
     global erase_mode, cut_side, erase_slice_width
     if erase_mode:
         shift_plane(viewer.layers[data_name], erase_slice_width)
@@ -556,11 +557,13 @@ def shift_plane_right_fast(viewer):
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
 # Define the functions to move left and right
-def move_left(viewer):
-    viewer.window._qt_viewer.viewer.dims._increment_dims_left()
+def move_left(viewer, distance=1):
+    # viewer.window._qt_viewer.viewer.dims._increment_dims_left()
+    shift_plane(viewer.layers[data_name], -distance)
 
-def move_right(viewer):
-    viewer.window._qt_viewer.viewer.dims._increment_dims_right()
+def move_right(viewer, distance=1):
+    # viewer.window._qt_viewer.viewer.dims._increment_dims_right()
+    shift_plane(viewer.layers[data_name], distance)
 
 # Create timers for holding keys
 left_timer = QTimer()
@@ -572,16 +575,24 @@ right_timer.timeout.connect(lambda: move_right(viewer))
 
 # Define the key press events
 #@viewer.bind_key('a', overwrite=True)
-def shift_dim_left(viewer):
+def shift_data_left(viewer):
     move_left(viewer)  # Move immediately on key press
     if not left_timer.isActive():
-        left_timer.start(100)  # Adjust the interval as needed
+        left_timer.start(50)  # Adjust the interval as needed
 
 #@viewer.bind_key('d', overwrite=True)
-def shift_dim_right(viewer):
+def shift_data_right(viewer):
     move_right(viewer)  # Move immediately on key press
     if not right_timer.isActive():
-        right_timer.start(100)  # Adjust the interval as needed
+        right_timer.start(50)  # Adjust the interval as needed
+
+def shift_data_left_fast(viewer):
+    move_left(viewer, 20)  # Move immediately on key press
+
+def shift_data_right_fast(viewer):
+    move_right(viewer, 20)  # Move immediately on key press
+
+
 
 # Function to stop timers when keys are released
 def stop_timers(event):
@@ -595,32 +606,30 @@ viewer.window._qt_viewer.canvas.events.key_release.connect(stop_timers)
 
 #keybind ' to switch to eraser on the 3d label layer
 #@viewer.bind_key('\'')
-def erase_3d_mode(viewer):
+def erase_mode(viewer):
     global eraser_size
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         viewer.layers[label_3d_name].mode = 'erase'
-        # viewer.layers[label_3d_name].brush_size = eraser_size
         viewer.layers.selection.active = viewer.layers[label_3d_name]
     elif viewer.dims.ndisplay == 3:
         viewer.layers[label_name].mode = 'erase'
-        # viewer.layers[label_name].brush_size = eraser_size
         viewer.layers.selection.active = viewer.layers[label_name]
     elif viewer.dims.ndisplay == 2:
         viewer.layers[label_name].mode = 'erase'
-        # viewer.layers[label_name].brush_size = eraser_size
         viewer.layers.selection.active = viewer.layers[label_name]
 
 #keybind , to enable the 3d slice erase mode
 #@viewer.bind_key(',')
-def plane_erase_3d_mode(viewer):
+def plane_erase_3d_mode(viewer, switch=True):
     global erase_mode, cut_side
-    erase_mode = not erase_mode
-    if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-        
+    if not erase_mode:
+        switch = False
+        erase_mode = True
+    if switch:
+        cut_side = not cut_side
+    if viewer.dims.ndisplay == 3 and viewer.layers[data_name].depiction == 'plane':
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
-      
-        viewer.layers[label_3d_name].mode = 'erase'
-        # viewer.layers[label_3d_name].brush_size = 4
+        viewer.layers[label_name].visible = False
 
 #keybind ; to enable 3d pan_zoom/move mode
 #@viewer.bind_key(';')
@@ -633,10 +642,13 @@ def move_mode(viewer):
 # keybind k to cut the label layer at the oblique plane, also called by left and right arrow
 #@viewer.bind_key('k', overwrite=True)
 def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
-    global cut_side
+    global erase_mode, cut_side
+    if erase_mode:
+        switch = False
+        erase_mode = False
     if switch:
         cut_side = not cut_side
-    if viewer.dims.ndisplay == 3:
+    if viewer.dims.ndisplay == 3 and viewer.layers[data_name].depiction == 'plane':
         cut_label_at_plane(viewer, erase_mode=False, cut_side=cut_side, prev_plane_info=prev_plane_info)
         
         viewer.layers[label_3d_name].visible = True

@@ -1,34 +1,51 @@
-#Napari default keybinds will overwrite custome keybinds in some modes
+#Napari default keybinds will overwrite the custom keybinds in some modes
+#Thus, it is recommended to not use the default keybinds for custom keybinds
 #Keys with default functions include:
 #x,y,z,o,p,[,],-,=
 customizable_hotkeys:
-  toggle_labels_visibility: ["/", "r"]
-  toggle_data_visibility: [".", "t"]
-  shift_plane_left: "Left"
-  shift_plane_right: "Right"
-  shift_plane_left_fast: "Shift-Left" 
-  shift_plane_right_fast: "Shift-Right"  
-  cut_label_at_oblique_plane: "k"
+  erase_mode: ["w"]
+  move_mode: ["s"]
+  toggle_labels_visibility: ["Shift-w","/", "r"]
+  toggle_data_visibility: ["Shift-s",".", "f"]
+  #------------------------
+  #arrow keys have 2d default behaviour, these extend behaviour to 3d plane shifting
+  shift_data_left_and_recut_3d_label: ["Left","Shift-q"]
+  shift_data_right_and_recut_3d_label: ["Right","Shift-e"]
+  shift_data_left_fast_and_recut_3d_label: "Shift-Left"
+  shift_data_right_fast_and_recut_3d_label: "Shift-Right"
+  #------------------------
+  # emulates arrow key behaviour in 2d view, extended for 3d view also
+  shift_data_left: "a"
+  shift_data_right: "d"
+  shift_data_left_fast: "Shift-a"
+  shift_data_right_fast: "Shift-d"
+  #------------------------
+  plane_erase_3d_mode: ["c",","]
+  plane_3d_erase_mode_shift_left: "q"
+  plane_3d_erase_mode_shift_right: "e"
+  cut_label_at_oblique_plane: ["Shift-v","k"]
+  switch_to_plane: ["Shift-c","g"]
+  full_label_view: "v"
+  add_padding_contextual_data: "t"
+
+  #l is defaulted for switching to data layer because it is near o
+  #as o for off-axis plane slice is a napari default (hard to change) 
+  #o is the main usecase for switching to the data layer in 3d
   switch_to_data_layer: "l"
-  full_label_view: "b"
-  switch_to_plane: "\\"
-  erase_3d_mode: "'"
-  move_mode: ";"
-  plane_erase_3d_mode: "," 
-  plane_3d_erase_mode_shift_left: ""
-  plane_3d_erase_mode_shift_right: ""
+  
+  #Can be used along side arrow keys (switching layers) to find connections in 2d
+  flood_fill: ["Down"]
+  large_flood_fill: ["Up"]
+
+  #------------------------
+  #less often used keybinds, may have gui button, or became less useful for defaults/3d
   erode_labels: "i"
   dilate_labels: "u"
-  add_padding_contextual_data: "j"
-  connected_components: "c"
-  flood_fill: ["f", "Down"]
-  large_flood_fill: ["g", "Up"]
+  connected_components: "'"
   save_labels: "h"
-  draw_compressed_class: "v"
-  decrease_brush_size: "q"
-  increase_brush_size: "e"
-  label_picker: "w"
-  toggle_show_selected_label: "s"
-  shift_dim_left: "a"
-  shift_dim_right: "d"
-  interpolate_borders: "x"
+  draw_compressed_class: "b"
+  decrease_brush_size: ""
+  increase_brush_size: ""
+  label_picker: ""
+  toggle_show_selected_label: ""
+  interpolate_borders: "m"

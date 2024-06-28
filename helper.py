@@ -137,7 +137,7 @@ def get_padded_nrrd_data(folder_path, original_coords, pad_amount, chunk_size=25
             missing_cubes.append((neighbor_z, neighbor_y, neighbor_x))
     
     if len(missing_cubes) > 0:
-        print("List of missing neighbor cubes:")
+        print("List of missing neighbor cubes for contextual data padding (works without them):")
         for cube in missing_cubes:
             print(f"volume_{cube[0]}_{cube[1]}_{cube[2]}.nrrd")
     
