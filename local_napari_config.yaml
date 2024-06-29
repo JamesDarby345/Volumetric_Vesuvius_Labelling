@@ -1,0 +1,63 @@
+cube_info:
+#cube z,y,x coords to load correct raw data & mask cubes
+  z: 7376
+  y: 3024
+  x: 4048
+  scroll_name: 's1'
+  chunk_size: 256
+  pad_amount: 100
+  brush_size: 4
+  use_zarr: True #True if using zarr for raw data instead of nrrd cubes, will still need nrrd mask cubes
+  zarr_path: '/Volumes/16TB_RAID_0/Scroll1/Scroll1.zarr'
+#Napari default keybinds will overwrite the custom keybinds in some modes
+#Thus, it is recommended to not use the default keybinds for custom keybinds
+#Keys with default functions include:
+#x,y,z,o,p,[,],-,=
+customizable_hotkeys:
+  erase_mode: ["w"]
+  move_mode: ["s"]
+  toggle_labels_visibility: ["Shift-s","/", "r"]
+  toggle_data_visibility: ["Shift-w",".", "f"]
+  #------------------------
+  #arrow keys have 2d default behaviour, these extend behaviour to 3d plane shifting
+  shift_data_left_and_recut_3d_label: ["Left","Shift-q"]
+  shift_data_right_and_recut_3d_label: ["Right","Shift-e"]
+  shift_data_left_fast_and_recut_3d_label: "Shift-Left"
+  shift_data_right_fast_and_recut_3d_label: "Shift-Right"
+  #------------------------
+  # emulates arrow key behaviour in 2d view, extended for 3d view also
+  shift_data_left: "a"
+  shift_data_right: "d"
+  shift_data_left_fast: "Shift-a"
+  shift_data_right_fast: "Shift-d"
+  #------------------------
+  plane_erase_3d_mode: ["c",","]
+  plane_3d_erase_mode_shift_left: "q"
+  plane_3d_erase_mode_shift_right: "e"
+  cut_label_at_oblique_plane: ["Shift-v","k"]
+  switch_to_plane_view: ["Shift-c","g"]
+  full_label_view: "v"
+  add_padding_contextual_data: "t"
+
+  #l is defaulted for switching to data layer because it is near o
+  #as o for off-axis plane slice is a napari default (hard to change) 
+  #o is the main usecase for switching to the data layer in 3d
+  switch_to_data_layer: "l"
+  
+  #Can be used along side arrow keys (switching layers) to find connections in 2d
+  flood_fill: ["Down"]
+  large_flood_fill: ["Up"]
+
+  #------------------------
+  #less often used keybinds, may have gui button, or became less useful for defaults/3d
+  erode_labels: "i"
+  dilate_labels: "u"
+  connected_components: "'"
+  save_labels: "h"
+  draw_compressed_class: "b"
+  decrease_brush_size: "Shift-z"
+  increase_brush_size: "Shift-x"
+  label_picker: ""
+  toggle_show_selected_label: ""
+  interpolate_borders: ""
+  set_corner_view: ""

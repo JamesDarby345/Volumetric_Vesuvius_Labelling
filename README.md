@@ -33,37 +33,9 @@ Search for Change to find path location variables to change to point to raw and 
 Optionally search for 'keybind' in the notebook to change the keys certain custom functions are mapped to. Note that keys like x,y,z,[,],-,= have default Napari mappings and may not work in all modes.
 
 ## Custom Napari Keybinds:<br>
-/ or r to toggle label visibility<br>
-. or t to toggle data visibility<br>
-Left & Right arrow keys scrub through layers in 2D & 3D planes<br>
-k to cut label at 3D plane location, toggles displayed side of cut<br>
-l to switch active layer to data layer (useful to move 3d plane with shift click)<br>
-b to toggle between 2D & 3D views with the full 3D label visible<br>
-\ to toggle between 2D & 3D views and setup plane cut view layers<br>
-' to switch to erase mode<br>
-; to switch to pan & zoom mode<br>
-, to toggle 3d plane precision erase mode<br>
-o to create off-axis plane cut in 3d mode (can also hold down to adjust)<br>
-shift + click to move the 3d volume plane quickly<br>
-shift + right click + drag up or down to 'fisheye' the view, useful to zoom into structures, note that erase etc doesnt work in this mode :(<br>
+See the napari_config.yaml file for the key binds
 
-i to erode labels 1 iteration<br>
-u to dilate labels 1 iteration<br>
-j to toggle context padding data<br>
-c to run connected components analysis and relabel<br>
-f or down arrow for 20 iteration flood fill<br>
-g or up arrow for 100 iteration flood fill<br>
-
-h to save data & labels as nrrd files<br>
-
-v to toggle compressed region class brush<br>
-q to decrease brush size<br>
-e to increase brush size<br>
-w to select label layer that was last clicked in move mode, alternatively use color picker (4)<br>
-s to toggle show selected label<br>
-a to move through layers in 2d<br>
-d to move through layers in 2d<br>
-x to extrapolate sparse compressed class labels<br>
+Note that you can create a local_napari_config.yaml file which will be read instead and is in thegitignore if you want to avoid conflicts if the config file is changed when pulling updates
 
 Note that moving the 3d plane with the arrows keys with the label visible (without hiding with /) can be laggy if moving more than one or two slices, use shift + click with the data layer selected (hotkey of l to select the data layer) or hide the label with / for better performance.
 
