@@ -14,10 +14,10 @@ cube_info:
 #Keys with default functions include:
 #x,y,z,o,p,[,],-,=
 customizable_hotkeys:
-  erase_mode: ["w"]
-  move_mode: ["s"]
-  toggle_labels_visibility: ["Shift-s","/", "r"]
-  toggle_data_visibility: ["Shift-w",".", "f"]
+  erase_mode: ["Shift-w"]
+  move_mode: ["Shift-s"]
+  toggle_labels_visibility: ["s","/", "r"]
+  toggle_data_visibility: ["w",".", "f"]
   #------------------------
   #arrow keys have 2d default behaviour, these extend behaviour to 3d plane shifting
   shift_data_left_and_recut_3d_label: ["Left","Shift-q"]
