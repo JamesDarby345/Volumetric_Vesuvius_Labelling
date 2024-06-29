@@ -751,6 +751,7 @@ def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
 #run connected components on the labels layer to get instance segmentations
 #@viewer.bind_key('c')
 def connected_components(viewer):
+    global erase_mode, cut_side
     msg = 'connected components'
     viewer.status = msg
     print(msg)
@@ -778,24 +779,19 @@ def connected_components(viewer):
         new_borders = old_borders
         viewer.add_labels(new_borders, name=compressed_name)
 
-    #apply any changes to the layer_3d_name layer to the labels layer
+    #apply any changes to the label_3d_name layer to the labels layer
     if label_3d_name in viewer.layers:
-        if prev_plane_info_var is not None:
-            cut_label_at_oblique_plane(viewer, switch=False, prev_plane_info=prev_plane_info_var)
-        else:
-            cut_label_at_oblique_plane(viewer, switch=False)
+        update_label_from_3d(viewer)
 
     #connected components data with both layer's borders removed
     cc_data = labels_layer.data.copy()
     cc_data[mask] = 0
 
     labels_layer.data = label_foreground_structures_napari(cc_data, compressed_class=compressed_class, min_size=200)
-    if label_3d_name in viewer.layers:
-        if prev_plane_info_var is not None:
-            cut_label_at_oblique_plane(viewer, switch=False, prev_plane_info=prev_plane_info_var)
-        else:
-            cut_label_at_oblique_plane(viewer, switch=False)
+    if label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
     msg = 'connected components finished'
+    show_popup(msg)
     viewer.status = msg
     print(msg)
 
@@ -912,10 +908,7 @@ def save_labels(viewer):
         os.makedirs(output_path)
     print(labels_layer.data.shape, labels_layer.data.dtype)
     if label_3d_name in viewer.layers:
-        if prev_plane_info_var is not None:
-            cut_label_at_oblique_plane(viewer, switch=False, prev_plane_info=prev_plane_info_var)
-        else:
-            cut_label_at_oblique_plane(viewer, switch=False)
+        update_label_from_3d(viewer)
     
     nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), labels_layer.data)
     nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_raw.nrrd"), viewer.layers[data_name].data)
