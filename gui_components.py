@@ -68,7 +68,7 @@ class VesuviusGUI:
         self.dilate_button = CustomButtonWidget("Dilate Labels", self.get_key_string('dilate_labels'), self.dilate_labels_gui)
         self.erode_button = CustomButtonWidget("Erode Labels", self.get_key_string('erode_labels'), self.erode_labels_gui)
         self.full_view_button = CustomButtonWidget("Toggle Full Label View", self.get_key_string('full_label_view'), self.toggle_full_label_view)
-        self.plane_cut_button = CustomButtonWidget("Toggle 3D Plane Cut View", self.get_key_string('switch_to_plane'), self.toggle_3D_plane_cut_view)
+        self.plane_cut_button = CustomButtonWidget("Toggle 3D Plane Cut View", self.get_key_string('switch_to_plane_view'), self.toggle_3D_plane_cut_view)
         self.padding_button = CustomButtonWidget("Toggle Padding Context", self.get_key_string('add_padding_contextual_data'), self.toggle_padding_context)
         self.cut_plane_button = CustomButtonWidget("Cut Label at Plane", self.get_key_string('cut_label_at_oblique_plane'), self.cut_label_at_plane_gui)
         self.components_button = CustomButtonWidget("Connected Components", self.get_key_string('connected_components'), self.run_connected_components)
@@ -192,7 +192,7 @@ class VesuviusGUI:
         self.functions['full_label_view'](self.viewer)
 
     def toggle_3D_plane_cut_view(self):
-        self.functions['switch_to_plane'](self.viewer)
+        self.functions['switch_to_plane_view'](self.viewer)
 
     def toggle_padding_context(self):
         self.functions['add_padding_contextual_data'](self.viewer)
@@ -247,7 +247,7 @@ class VesuviusGUI:
         - {get_key_string('cut_label_at_oblique_plane')} to cut label at 3D plane location<br>
         - {get_key_string('switch_to_data_layer')} to switch active layer to data layer<br>
         - {get_key_string('full_label_view')} to toggle full 3D label view<br>
-        - {get_key_string('switch_to_plane')} to toggle 3D plane cut view layers<br>
+        - {get_key_string('switch_to_plane_view')} to toggle 3D plane cut view layers<br>
         - {get_key_string('erase_3d_mode')} to switch to erase mode<br>
         - {get_key_string('move_mode')} to switch to pan & zoom mode<br>
         - {get_key_string('plane_erase_3d_mode')} to toggle 3D plane precision erase mode<br>

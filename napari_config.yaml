@@ -7,8 +7,8 @@ cube_info:
   chunk_size: 256
   pad_amount: 100
   brush_size: 4
-  use_zarr: False #True if using zarr for raw data instead of nrrd cubes, will still need nrrd mask cubes
-  zarr_path: 'full/path/to/file.zarr'
+  use_zarr: True #True if using zarr for raw data instead of nrrd cubes, will still need nrrd mask cubes
+  zarr_path: '/Volumes/16TB_RAID_0/Scroll1/Scroll1.zarr'
 #Napari default keybinds will overwrite the custom keybinds in some modes
 #Thus, it is recommended to not use the default keybinds for custom keybinds
 #Keys with default functions include:
@@ -35,7 +35,7 @@ customizable_hotkeys:
   plane_3d_erase_mode_shift_left: "q"
   plane_3d_erase_mode_shift_right: "e"
   cut_label_at_oblique_plane: ["Shift-v","k"]
-  switch_to_plane: ["Shift-c","g"]
+  switch_to_plane_view: ["Shift-c","g"]
   full_label_view: "v"
   add_padding_contextual_data: "t"
 
@@ -61,4 +61,3 @@ customizable_hotkeys:
   toggle_show_selected_label: ""
   interpolate_borders: ""
   set_corner_view: ""
-  print_camera_info: "m"

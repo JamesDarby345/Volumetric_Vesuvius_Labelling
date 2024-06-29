@@ -18,6 +18,7 @@ from napari.utils.interactions import mouse_press_callbacks, mouse_move_callback
 import yaml
 from pathlib import Path
 import sys
+from collections import namedtuple
 
 def read_config(config_path='napari_config.yaml'):
     config_path = Path(config_path)
@@ -97,6 +98,7 @@ data_name = 'Data'
 compressed_name = 'Compressed Regions'
 ff_name = 'flood_fill_layer'
 label_3d_name = '3D Label Edit Layer'
+erase_plane_cc_name = 'Erase Plane Connected Components'
 compressed_class = 254
 pad_state = False
 erase_mode = False
@@ -277,9 +279,31 @@ def large_flood_fill(viewer):
 prev_plane_info_var = None
 prev_erase_plane_info_var = None
 
+# Define a namedtuple to store camera information
+CameraInfo = namedtuple('CameraInfo', ['center', 'angles', 'zoom'])
+global prev_camera_pos
+prev_camera_pos = None
+
 # Persistent variables to store the previous state and mask
 previous_label_3d_data = None
 manual_changes_mask = None
+
+def get_current_camera_info(viewer):
+    center=viewer.camera.center
+    angles=viewer.camera.angles
+    zoom=viewer.camera.zoom
+    return CameraInfo(center, angles, zoom)
+
+def set_camera_view(viewer, camera_pos = None):
+    if camera_pos is not None:
+        viewer.camera.center = camera_pos.center
+        viewer.camera.angles = camera_pos.angles
+        viewer.camera.zoom = camera_pos.zoom
+    else:
+        center = (chunk_size // 2, chunk_size // 2, chunk_size // 2)
+        viewer.camera.center = center
+        viewer.camera.angles = (-10,30,65)  # Setting roll to 0
+        viewer.camera.zoom = 1.8  # You may need to adjust this value
 
 def process_value(value, data, erode, erosion_iterations, dilation_iterations, original_label_data):
     structure_mask = data == value
@@ -395,6 +419,7 @@ def shift_plane(layer, direction, padding_mode=False, padding=50):
 #keybind b to switch to full label 3d view
 #@viewer.bind_key('b', overwrite=True)
 def full_label_view(viewer):
+    global prev_camera_pos
     if viewer.dims.ndisplay == 2:
         viewer.dims.ndisplay = 3
         for layer in viewer.layers:
@@ -403,9 +428,12 @@ def full_label_view(viewer):
             else:
                 viewer.layers[layer.name].visible = True
                 viewer.layers[layer.name].blending = 'opaque'
-                
+        if prev_camera_pos is not None:
+            set_camera_view(viewer, prev_camera_pos)
     else:
+        prev_camera_pos = get_current_camera_info(viewer)
         viewer.dims.ndisplay = 2
+        #TODO update label layer from plane mode changes
         for layer in viewer.layers:
             if layer.name != label_3d_name:
                 viewer.layers[layer.name].visible = True
@@ -420,9 +448,11 @@ def full_label_view(viewer):
 
 #keybind \ to setup the 3d viewing mode conviniently with custom vesuvius layers
 #@viewer.bind_key('\\')
-def switch_to_plane(viewer):
+def switch_to_plane_view(viewer):
+    global prev_camera_pos
    # Switch to 3D mode
     if viewer.dims.ndisplay == 3:
+        prev_camera_pos = get_current_camera_info(viewer)
         viewer.dims.ndisplay = 2
         for layer in viewer.layers:
             if layer.name != label_3d_name:
@@ -435,8 +465,8 @@ def switch_to_plane(viewer):
         viewer.layers[label_name].contour = 1
 
     else:
+        # Switch to 3D mode
         step_val = viewer.dims.current_step
-        # print(f"Current step: {step_val}")
         viewer.dims.ndisplay = 3
     
         # Prep layers visibility and blending
@@ -460,6 +490,8 @@ def switch_to_plane(viewer):
                 viewer.layers[layer.name].affine = np.eye(3)  # Ensure the affine transform is identity for proper rendering
                 viewer.layers[layer.name].blending = 'opaque'
                 viewer.layers.selection.active = viewer.layers[layer.name]
+        if prev_camera_pos is not None:
+            set_camera_view(viewer, prev_camera_pos)
 
 def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=None):
     global previous_label_3d_data, manual_changes_mask, prev_plane_info_var, erase_slice_width, brush_size, plane_shift_status
@@ -737,7 +769,7 @@ def connected_components(viewer):
     cc_data = labels_layer.data.copy()
     cc_data[mask] = 0
 
-    labels_layer.data = label_foreground_structures_napari(cc_data, compressed_class=compressed_class, min_size=1000)
+    labels_layer.data = label_foreground_structures_napari(cc_data, compressed_class=compressed_class, min_size=200)
     if label_3d_name in viewer.layers:
         if prev_plane_info_var is not None:
             cut_label_at_oblique_plane(viewer, switch=False, prev_plane_info=prev_plane_info_var)
@@ -905,28 +937,12 @@ def bind_hotkeys(viewer, config, module=None, overwrite=True):
             except (ValueError, TypeError) as e:
                 print(f"Error binding key '{keys}' to function '{func_name}': {str(e)}")
 
-def set_corner_view(viewer):
-    center = (chunk_size // 2, chunk_size // 2, chunk_size // 2)
-    # Calculate azimuth and elevation
-    # Set the camera properties
-    viewer.camera.center = center
-    viewer.camera.angles = (-10,30,65)  # Setting roll to 0
-    
-    # Adjust zoom to fit the view
-    viewer.camera.zoom = 1.8  # You may need to adjust this value
-
-def print_camera_info(viewer):
-    camera = viewer.camera
-    print(f"Center: {camera.center}")
-    print(f"Angles: {camera.angles}")
-    print(f"Zoom: {camera.zoom}")
-
 # Create a dictionary of functions to pass to the GUI
 functions_dict = {
     'erode_labels': erode_labels,
     'dilate_labels': dilate_labels,
     'full_label_view': full_label_view,
-    'switch_to_plane': switch_to_plane,
+    'switch_to_plane': switch_to_plane_view,
     'add_padding_contextual_data': add_padding_contextual_data,
     'cut_label_at_oblique_plane': cut_label_at_oblique_plane,
     'connected_components': connected_components,
@@ -943,7 +959,7 @@ gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotke
 gui.setup_napari_defaults()
 
 bind_hotkeys(viewer, hotkey_config)
-set_corner_view(viewer)
+set_camera_view(viewer)
 
 # Start the Napari event loop
 napari.run()
