@@ -31,7 +31,8 @@ def read_config(config_path='napari_config.yaml'):
             return config.get('cube_info',{}), config.get('customizable_hotkeys', {})
     return {}
 
-cube_info, hotkey_config = read_config()
+config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
+cube_info, hotkey_config = read_config(config_path)
 
 # Data location and size parameters
 scroll_name = cube_info.get('scroll_name', "")
@@ -985,7 +986,7 @@ gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotke
 gui.setup_napari_defaults()
 
 bind_hotkeys(viewer, hotkey_config)
-# set_camera_view(viewer)
+set_camera_view(viewer)
 setup_brush_size_listener(viewer, label_name)
 
 # Start the Napari event loop

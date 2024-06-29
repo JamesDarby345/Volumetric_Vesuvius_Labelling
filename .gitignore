@@ -3,3 +3,4 @@ __pycache__
 .DS_Store
 /data
 /napari_examples
+local_napari_congfig.yaml

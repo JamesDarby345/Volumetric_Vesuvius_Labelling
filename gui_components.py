@@ -63,6 +63,40 @@ class VesuviusGUI:
             return ' or '.join(keys)
         return str(keys)
 
+    def create_button_container(self):
+        container = QWidget()
+        layout = QVBoxLayout()
+        container.setLayout(layout)
+        buttons = [self.dilate_button, self.erode_button, self.full_view_button, self.plane_cut_button, 
+                self.cut_plane_button, self.padding_button, self.components_button, self.save_button]
+        for button in buttons:
+            layout.addWidget(button)
+        return container
+
+    def create_erase_width_input(self):
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel("Erase slice Width:"))
+        self.erase_slice_width_spinbox = QSpinBox()
+        self.erase_slice_width_spinbox.setMinimum(1)
+        self.erase_slice_width_spinbox.setMaximum(100)
+        self.erase_slice_width_spinbox.setValue(self.erase_slice_width)
+        self.erase_slice_width_spinbox.valueChanged.connect(self.update_erase_slice_width)
+        layout.addWidget(self.erase_slice_width_spinbox)
+        return layout
+
+    def create_instruction_scroll_area(self):
+        text_container = QWidget()
+        text_layout = QVBoxLayout()
+        text_container.setLayout(text_layout)
+        instruction_label = QLabel(self.get_instruction_text(self.config))
+        instruction_label.setWordWrap(True)
+        instruction_label.setAlignment(Qt.AlignmentFlag.AlignTop)
+        text_layout.addWidget(instruction_label)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(text_container)
+        return scroll_area
+
     def setup_gui(self):
         # Create custom button widgets
         self.dilate_button = CustomButtonWidget("Dilate Labels", self.get_key_string('dilate_labels'), self.dilate_labels_gui)
@@ -73,66 +107,27 @@ class VesuviusGUI:
         self.cut_plane_button = CustomButtonWidget("Cut Label at Plane", self.get_key_string('cut_label_at_oblique_plane'), self.cut_label_at_plane_gui)
         self.components_button = CustomButtonWidget("Connected Components", self.get_key_string('connected_components'), self.run_connected_components)
         self.save_button = CustomButtonWidget("Save Labels", self.get_key_string('save_labels'), self.save_labels_button)
-    
+
         color_picker_widget = ColorPickerWidget(self.viewer)
 
-        # Create erase width input
-        erase_slice_width_layout = QHBoxLayout()
-        erase_slice_width_label = QLabel("Erase slice Width:")
-        self.erase_slice_width_spinbox = QSpinBox()
-        self.erase_slice_width_spinbox.setMinimum(1)
-        self.erase_slice_width_spinbox.setMaximum(100)
-        self.erase_slice_width_spinbox.setValue(self.erase_slice_width)
-        self.erase_slice_width_spinbox.valueChanged.connect(self.update_erase_slice_width)
-        erase_slice_width_layout.addWidget(erase_slice_width_label)
-        erase_slice_width_layout.addWidget(self.erase_slice_width_spinbox)
+        button_container = self.create_button_container()
+        erase_width_layout = self.create_erase_width_input()
 
-        # Create a container widget for buttons
-        button_container_widget = QWidget()
-        button_container_layout = QVBoxLayout()
-        button_container_widget.setLayout(button_container_layout)
+        main_container = QWidget()
+        main_layout = QVBoxLayout()
+        main_container.setLayout(main_layout)
+        main_container.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Maximum)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(5)
 
-        # Add buttons to the container
-        for button in [self.dilate_button, self.erode_button, self.full_view_button, self.plane_cut_button, 
-                       self.cut_plane_button, self.padding_button, self.components_button, self.save_button]:
-            button_container_layout.addWidget(button)
+        main_layout.addWidget(button_container)
+        main_layout.addLayout(erase_width_layout)
+        main_layout.addWidget(color_picker_widget)
 
-        button_container_layout.addLayout(erase_slice_width_layout)
-        button_container_layout.addWidget(color_picker_widget)
+        self.viewer.window.add_dock_widget(main_container, area='right')
 
-        # Create a container widget for the instruction text with scrollable area
-        text_container_widget = QWidget()
-        text_container_layout = QVBoxLayout()
-        text_container_widget.setLayout(text_container_layout)
-
-        instruction_label = QLabel(self.get_instruction_text(self.config))
-        instruction_label.setWordWrap(True)
-        instruction_label.setAlignment(Qt.AlignmentFlag.AlignTop)
-        text_container_layout.addWidget(instruction_label)
-
-        # Add the text container to a scroll area
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setWidget(text_container_widget)
-
-        # Create a main container widget to hold both button and text containers
-        main_container_widget = QWidget()
-        main_container_layout = QVBoxLayout()
-        main_container_widget.setLayout(main_container_layout)
-
-        # Adjust size policies and layout properties
-        main_container_widget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Maximum)
-        main_container_layout.setContentsMargins(0, 0, 0, 0)
-        main_container_layout.setSpacing(5)
-
-        # Add button container to the main container
-        main_container_layout.addWidget(button_container_widget)
-
-        # Add the main container to the viewer
-        self.viewer.window.add_dock_widget(main_container_widget, area='right')
-
-        # Add the scroll area to the viewer as a separate dock widget
-        self.viewer.window.add_dock_widget(scroll_area, area='right')
+        instruction_scroll_area = self.create_instruction_scroll_area()
+        self.viewer.window.add_dock_widget(instruction_scroll_area, area='right')
 
     def update_erase_slice_width(self, value):
         self.erase_slice_width = value

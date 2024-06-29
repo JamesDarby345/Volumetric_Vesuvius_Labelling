@@ -31,7 +31,6 @@ def patched_viewbox_mouse_event(self, event):
     if event.type == 'mouse_release':
         self._event_value = None  # Reset
     elif event.type == 'mouse_press':
-        print(event.pos)
         self._event_value = event.pos[:2]  # Only take the first two values
         event.handled = True
     elif event.type == 'mouse_move':
