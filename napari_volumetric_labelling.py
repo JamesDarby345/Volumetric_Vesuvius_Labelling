@@ -3,22 +3,24 @@ import napari
 import os
 import numpy as np
 import zarr
-import blosc2
 from helper import *
 from gui_components import VesuviusGUI
 from napari.layers import Image
-from scipy.ndimage import binary_dilation, binary_erosion, binary_closing
-from qtpy.QtWidgets import QSizePolicy,QMessageBox,QPushButton, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QScrollArea
+from scipy.ndimage import binary_dilation, binary_erosion
+from qtpy.QtWidgets import QMessageBox
 from qtpy.QtCore import QTimer, Qt
-from magicgui import magicgui
-from magicgui.widgets import Container
 from napari.qt.threading import thread_worker
 from napari.utils.notifications import show_info
 from napari.utils.interactions import mouse_press_callbacks, mouse_move_callbacks, mouse_release_callbacks
+from vispy.util.quaternion import Quaternion
 import yaml
 from pathlib import Path
 import sys
 from collections import namedtuple
+from vispy.scene.cameras.perspective import Base3DRotationCamera
+
+Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
+
 
 def read_config(config_path='napari_config.yaml'):
     config_path = Path(config_path)
@@ -82,6 +84,53 @@ if bright_spot_masking:
 
 # Initialize the Napari viewer
 viewer = napari.Viewer()
+
+
+def dist_to_trans(quat, dist, translate_speed):
+    """Convert mouse x, y movement into x, y, z translations"""
+    rot, x, y, z = quat.get_axis_angle()
+    print(f"Rotation: {rot}, Axis: {x, y, z}")
+    rot_matrix = Quaternion.create_from_axis_angle(rot, x, y, z).get_matrix()[:3, :3]
+    dx, dz, dy = np.dot(rot_matrix, (dist[0], dist[1], 0.)) * translate_speed
+    return dx, dy, dz
+
+@viewer.mouse_drag_callbacks.append
+def pan_with_middle_mouse(viewer, event):
+    if event.button == 3:  # Middle mouse button
+        original_mode = viewer.layers.selection.active.mode
+        viewer.layers.selection.active.mode = 'pan_zoom'
+
+        initial_pos = np.array(event.pos)
+        initial_center = np.array(viewer.camera.center)
+
+        yield
+        while event.type == 'mouse_move':
+            # Calculate the movement delta
+            delta = np.array(event.pos) - initial_pos
+            
+            # Get current camera properties
+            center = np.array(viewer.camera.center)
+            zoom = viewer.camera.zoom
+            angles = viewer.camera.angles
+            
+            # Convert Euler angles to quaternion
+            quat = Quaternion.create_from_euler_angles(*angles, degrees=True)
+            
+            # Convert mouse movement to camera space movement
+            translate_speed = 1.0 / zoom  # Adjust this value as needed
+            dx, dy, dz = dist_to_trans(quat, delta, translate_speed)
+            
+            # Update camera center
+            new_center = initial_center - np.array([dx, dy, dz])
+            viewer.camera.center = new_center
+            
+            print(f"Delta: {delta}")
+            print(f"Movement: {dx, dy, dz}")
+            print(f"Old center: {initial_center}")
+            print(f"New center: {new_center}")
+            
+            yield
+        viewer.layers.selection.active.mode = original_mode
 
 #layer name variables
 label_name = 'Labels'
@@ -972,7 +1021,7 @@ gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotke
 gui.setup_napari_defaults()
 
 bind_hotkeys(viewer, hotkey_config)
-set_camera_view(viewer)
+# set_camera_view(viewer)
 setup_brush_size_listener(viewer, label_name)
 
 # Start the Napari event loop
