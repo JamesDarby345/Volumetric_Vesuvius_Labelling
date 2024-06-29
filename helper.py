@@ -192,9 +192,9 @@ def get_padded_nrrd_data(folder_path, z, y, x, pad_amount, chunk_size=256):
     padded_raw_data = np.zeros((padded_size, padded_size, padded_size))
     
     for dz, dy, dx in neighbors:
-        neighbor_z = str(z + dz * chunk_size).zfill(5)
-        neighbor_y = str(y + dy * chunk_size).zfill(5)
-        neighbor_x = str(x + dx * chunk_size).zfill(5)
+        neighbor_z = str(int(z) + dz * chunk_size).zfill(5)
+        neighbor_y = str(int(y) + dy * chunk_size).zfill(5)
+        neighbor_x = str(int(x) + dx * chunk_size).zfill(5)
         
         filename = f"{neighbor_z}_{neighbor_y}_{neighbor_x}/{neighbor_z}_{neighbor_y}_{neighbor_x}_volume.nrrd"
         filepath = os.path.join(folder_path, filename)
