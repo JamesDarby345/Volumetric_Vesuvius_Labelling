@@ -111,8 +111,6 @@ def numba_dilation_3d_labels(data, iterations):
                         
     return result
 
-
-
 def show_popup(message):
     msg = QMessageBox()
     msg.setIcon(QMessageBox.Information)

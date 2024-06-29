@@ -73,7 +73,11 @@ else:
     data = raw_data
 
 #If padded raw data isnt setup, just set it to raw_data
-if len(padded_raw_data) == 0:
+try:
+    if len(padded_raw_data) == 0:
+        padded_raw_data = raw_data
+except Exception as e:
+    print(f"An unexpected error occurred with padded_raw_data: {e}")
     padded_raw_data = raw_data
 
 # removes bright spots from the data, brightest 0.5% of the data
