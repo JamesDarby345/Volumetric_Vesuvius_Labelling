@@ -2,7 +2,7 @@ import numpy as np
 from skimage.color import gray2rgb
 from skimage.segmentation import find_boundaries
 from skimage.util import img_as_float
-from skimage.morphology import dilation, square, remove_small_objects, remove_small_holes
+from skimage.morphology import dilation, square, remove_small_objects
 import random
 import scipy.ndimage
 from matplotlib import pyplot as plt
@@ -10,12 +10,9 @@ from scipy.ndimage import binary_dilation
 from scipy.interpolate import interp1d
 import os
 import nrrd
-import colorsys
 from qtpy.QtWidgets import QMessageBox
 from napari.utils.colormaps import DirectLabelColormap
 from collections import defaultdict
-from qtpy.QtWidgets import QPushButton, QColorDialog, QVBoxLayout, QWidget
-from qtpy.QtCore import Qt
 from vispy.scene.cameras.perspective import PerspectiveCamera, Base3DRotationCamera
 from vispy.util import keys
 from collections import deque
@@ -162,7 +159,14 @@ def get_padded_nrrd_data(folder_path, original_coords, pad_amount, chunk_size=25
         filepath = os.path.join(folder_path, filename)
         
         if os.path.exists(filepath):
-            data, _ = nrrd.read(filepath)
+            try:
+                data, header = nrrd.read(filepath)
+            except StopIteration:
+                print(f"Error: Unable to read the NRRD file header from {filepath}")
+                return None
+            except Exception as e:
+                print(f"An unexpected error occurred: {e}")
+                return None
             
             # Determine the slices to extract from this cube
             z_start = chunk_size - pad_amount if dz < 0 else 0
