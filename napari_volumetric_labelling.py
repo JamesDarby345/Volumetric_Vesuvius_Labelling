@@ -36,9 +36,12 @@ cube_info, hotkey_config = read_config(config_path)
 
 # Data location and size parameters
 scroll_name = cube_info.get('scroll_name', "")
-z = cube_info.get('z', 0)
-y = cube_info.get('y', 0)
-x = cube_info.get('x', 0)
+z = cube_info.get('z', '02000')
+y = cube_info.get('y', '02000')
+x = cube_info.get('x', '02000')
+z_num = int(z)
+y_num = int(y)
+x_num = int(x)
 chunk_size = cube_info.get('chunk_size', 256)
 pad_amount = cube_info.get('pad_amount', 100)
 brush_size = cube_info.get('brush_size', 4)
@@ -52,13 +55,13 @@ raw_data = None
 data = None
 
 nrrd_cube_path = os.path.join(current_directory, 'data/nrrd_cubes') #Change to the path of the folder containing the nrrd cubes
-original_label_data, _ = nrrd.read(nrrd_cube_path+f'/mask_{z}_{y}_{x}.nrrd')
+original_label_data, _ = nrrd.read(nrrd_cube_path+f'/{z}_{y}_{x}/{z}_{y}_{x}_mask.nrrd')
 label_data = original_label_data
 
 #nrrd zyx coord cubes
 if not use_zarr:
-    raw_data, _ = nrrd.read(nrrd_cube_path+f'/volume_{z}_{y}_{x}.nrrd')
-    padded_raw_data = get_padded_nrrd_data(nrrd_cube_path, (z, y, x), pad_amount)
+    raw_data, _ = nrrd.read(nrrd_cube_path+f'/{z}_{y}_{x}/{z}_{y}_{x}_volume.nrrd')
+    padded_raw_data = get_padded_nrrd_data(nrrd_cube_path, (z_num, y_num, x_num), pad_amount)
     data = raw_data
 else:
     #use zarr is true
@@ -66,10 +69,10 @@ else:
     zarr_multi_res = zarr.open(zarr_path, mode='r')
     zarr = zarr_multi_res[0]
 
-    raw_data = zarr[z:z+chunk_size, y:y+chunk_size, x:x+chunk_size]
+    raw_data = zarr[z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
 
     #Note: will crash if out of bounds and not checking at the moment
-    padded_raw_data = zarr[z-pad_amount:z+chunk_size+pad_amount, y-pad_amount:y+chunk_size+pad_amount, x-pad_amount:x+chunk_size+pad_amount]
+    padded_raw_data = get_padded_data_zarr(zarr_multi_res, (z_num, y_num, x_num), pad_amount)
     data = raw_data
 
 #If padded raw data isnt setup, just set it to raw_data
@@ -79,8 +82,6 @@ try:
 except Exception as e:
     print(f"An unexpected error occurred with padded_raw_data: {e}")
     padded_raw_data = raw_data
-
-print(padded_raw_data.shape)
 
 # removes bright spots from the data, brightest 0.5% of the data
 bright_spot_masking = False
@@ -92,19 +93,6 @@ if bright_spot_masking:
 
 # Initialize the Napari viewer
 viewer = napari.Viewer()
-
-@viewer.mouse_drag_callbacks.append
-def pan_with_middle_mouse(viewer, event):
-    if event.button == 3 or event.button == 2 or (event.button == 1 and keys.SHIFT in event.modifiers):  # Middle mouse button or right click
-        if viewer.layers.selection.active is None:
-            viewer.layers.selection.active = viewer.layers[label_name]
-            viewer.layers[label_name].mode = 'pan_zoom'
-        original_mode = viewer.layers.selection.active.mode
-        viewer.layers.selection.active.mode = 'pan_zoom'
-        yield
-        while event.type == 'mouse_move':
-            yield
-        viewer.layers.selection.active.mode = original_mode
 
 #layer name variables
 label_name = 'Labels'
@@ -129,7 +117,7 @@ labels_layer = viewer.add_labels(label_data, name=label_name)
 
 #load saved labels and compressed labels if they exist
 file_path = f'output/volumetric_labels_{scroll_name}/'
-label_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
+label_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}/{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
 if os.path.exists(label_path):
     label_data, _ = nrrd.read(label_path)
     if bright_spot_masking:
@@ -143,6 +131,20 @@ compressed_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}_zyx_{
 if os.path.exists(compressed_path):
     data, _ = nrrd.read(compressed_path)
     viewer.add_labels(data, name=compressed_name)
+
+@viewer.mouse_drag_callbacks.append
+def pan_with_middle_mouse(viewer, event):
+    if event.button == 3 or event.button == 2 or (event.button == 1 and keys.SHIFT in event.modifiers):  # Middle mouse button or right click
+        if viewer.layers.selection.active is None:
+            viewer.layers.selection.active = viewer.layers[label_name]
+            viewer.layers[label_name].mode = 'pan_zoom'
+        original_mode = viewer.layers.selection.active.mode
+        viewer.layers.selection.active.mode = 'pan_zoom'
+        yield
+        while event.type == 'mouse_move':
+            yield
+        viewer.layers.selection.active.mode = original_mode
+
 
 def apply_global_brush_size(viewer, source_layer=None):
     global brush_size
@@ -604,11 +606,11 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     # Create a copy of the label data and set all voxels between the viewer and the plane to 0
     new_label_data = labels_layer.data.copy()
     if cut_side:
-        new_label_data[distances > 1.5] = 0
+        new_label_data[distances > -2.5] = 0
         if erase_mode:
             new_label_data[distances < -erase_slice_width + 0.5] = 0
     else:
-        new_label_data[distances < -1.5] = 0
+        new_label_data[distances < 2.5] = 0
         if erase_mode:
             new_label_data[distances > erase_slice_width + 0.5] = 0
 
@@ -619,18 +621,20 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     previous_label_3d_data = new_label_data.copy()
 
 def plane_3d_erase_mode_shift_left(viewer):
-    global erase_mode, prev_erase_plane_info_var
+    global erase_mode, prev_erase_plane_info_var, erase_slice_width
+    overlap = erase_slice_width//10
     if erase_mode:
-        shift_prev_erase_plane(-erase_slice_width)
-        shift_plane(viewer.layers[data_name], -erase_slice_width)
+        shift_prev_erase_plane(-erase_slice_width+overlap)
+        shift_plane(viewer.layers[data_name], -erase_slice_width+overlap)
         if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
             cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
 def plane_3d_erase_mode_shift_right(viewer):
-    global erase_mode, prev_erase_plane_info_var
+    global erase_mode, prev_erase_plane_info_var, erase_slice_width
+    overlap = erase_slice_width//10
     if erase_mode:
-        shift_prev_erase_plane(erase_slice_width)
-        shift_plane(viewer.layers[data_name], erase_slice_width)
+        shift_prev_erase_plane(erase_slice_width-overlap)
+        shift_plane(viewer.layers[data_name], erase_slice_width-overlap)
         if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
             cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
@@ -925,7 +929,7 @@ def save_labels(viewer):
     viewer.status = msg
     print(msg)
     current_directory = os.getcwd()
-    file_path = f'output/volumetric_labels_{scroll_name}/'
+    file_path = f'output/volumetric_labels_{scroll_name}/{z}_{y}_{x}'
     output_path = os.path.join(current_directory, file_path)
     if not os.path.exists(output_path):
         os.makedirs(output_path)

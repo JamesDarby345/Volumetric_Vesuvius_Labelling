@@ -127,6 +127,53 @@ def confirm_popup(message):
     msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
     return msg.exec_()
 
+def get_padded_data_zarr(cube_info, z_num, y_num, x_num, chunk_size, pad_amount):
+    zarr_path = cube_info.get('zarr_path', "")
+    zarr_multi_res = zarr.open(zarr_path, mode='r')
+    zarr = zarr_multi_res[0]
+    
+    # Get the shape of the zarr array
+    z_shape, y_shape, x_shape = zarr.shape
+
+    # Compute indices with out-of-bounds checking
+    z_start = max(0, z_num)
+    z_end = min(z_shape, z_num + chunk_size)
+    y_start = max(0, y_num)
+    y_end = min(y_shape, y_num + chunk_size)
+    x_start = max(0, x_num)
+    x_end = min(x_shape, x_num + chunk_size)
+
+    raw_data = zarr[z_start:z_end, y_start:y_end, x_start:x_end]
+
+    # Compute padded indices with out-of-bounds checking
+    z_padded_start = max(0, z_num - pad_amount)
+    z_padded_end = min(z_shape, z_num + chunk_size + pad_amount)
+    y_padded_start = max(0, y_num - pad_amount)
+    y_padded_end = min(y_shape, y_num + chunk_size + pad_amount)
+    x_padded_start = max(0, x_num - pad_amount)
+    x_padded_end = min(x_shape, x_num + chunk_size + pad_amount)
+
+    padded_raw_data = np.zeros((z_padded_end - z_padded_start,
+                                y_padded_end - y_padded_start,
+                                x_padded_end - x_padded_start))
+
+    # Fill the valid region of the padded array
+    z_slice = slice(z_padded_start, z_padded_end)
+    y_slice = slice(y_padded_start, y_padded_end)
+    x_slice = slice(x_padded_start, x_padded_end)
+    
+    z_paste_start = max(0, pad_amount - z_num)
+    y_paste_start = max(0, pad_amount - y_num)
+    x_paste_start = max(0, pad_amount - x_num)
+    
+    z_paste_end = z_paste_start + (z_end - z_start)
+    y_paste_end = y_paste_start + (y_end - y_start)
+    x_paste_end = x_paste_start + (x_end - x_start)
+
+    padded_raw_data[z_paste_start:z_paste_end, y_paste_start:y_paste_end, x_paste_start:x_paste_end] = raw_data
+    
+    return padded_raw_data
+
 def get_padded_nrrd_data(folder_path, original_coords, pad_amount, chunk_size=256):
     z, y, x = original_coords
     padded_raw_data = None
@@ -153,7 +200,7 @@ def get_padded_nrrd_data(folder_path, original_coords, pad_amount, chunk_size=25
         neighbor_y = y + dy * chunk_size
         neighbor_x = x + dx * chunk_size
         
-        filename = f"volume_{neighbor_z}_{neighbor_y}_{neighbor_x}.nrrd"
+        filename = f"{neighbor_z}_{neighbor_y}_{neighbor_x}/{neighbor_z}_{neighbor_y}_{neighbor_x}_volume.nrrd"
         filepath = os.path.join(folder_path, filename)
         
         if os.path.exists(filepath):
