@@ -61,18 +61,16 @@ label_data = original_label_data
 #nrrd zyx coord cubes
 if not use_zarr:
     raw_data, _ = nrrd.read(nrrd_cube_path+f'/{z}_{y}_{x}/{z}_{y}_{x}_volume.nrrd')
-    padded_raw_data = get_padded_nrrd_data(nrrd_cube_path, (z_num, y_num, x_num), pad_amount)
+    padded_raw_data = get_padded_nrrd_data(nrrd_cube_path, z, y, x, pad_amount)
     data = raw_data
 else:
     #use zarr is true
     zarr_path = cube_info.get('zarr_path', "") #Change this to the path of the zarr file if using zarr
     zarr_multi_res = zarr.open(zarr_path, mode='r')
-    zarr = zarr_multi_res[0]
 
-    raw_data = zarr[z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
+    raw_data = zarr_multi_res[0][z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
 
-    #Note: will crash if out of bounds and not checking at the moment
-    padded_raw_data = get_padded_data_zarr(zarr_multi_res, (z_num, y_num, x_num), pad_amount)
+    padded_raw_data = get_padded_data_zarr(zarr_multi_res[0], z_num, y_num, x_num, chunk_size, pad_amount)
     data = raw_data
 
 #If padded raw data isnt setup, just set it to raw_data

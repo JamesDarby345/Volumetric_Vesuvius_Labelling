@@ -17,6 +17,7 @@ from vispy.scene.cameras.perspective import PerspectiveCamera, Base3DRotationCam
 from vispy.util import keys
 from collections import deque
 import numba
+import zarr 
 
 #monkey-patch the camera controls
 def patched_viewbox_mouse_event(self, event):
@@ -127,13 +128,9 @@ def confirm_popup(message):
     msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
     return msg.exec_()
 
-def get_padded_data_zarr(cube_info, z_num, y_num, x_num, chunk_size, pad_amount):
-    zarr_path = cube_info.get('zarr_path', "")
-    zarr_multi_res = zarr.open(zarr_path, mode='r')
-    zarr = zarr_multi_res[0]
-    
+def get_padded_data_zarr(zarr_arr, z_num, y_num, x_num, chunk_size, pad_amount):
     # Get the shape of the zarr array
-    z_shape, y_shape, x_shape = zarr.shape
+    z_shape, y_shape, x_shape = zarr_arr.shape
 
     # Compute indices with out-of-bounds checking
     z_start = max(0, z_num)
@@ -143,7 +140,7 @@ def get_padded_data_zarr(cube_info, z_num, y_num, x_num, chunk_size, pad_amount)
     x_start = max(0, x_num)
     x_end = min(x_shape, x_num + chunk_size)
 
-    raw_data = zarr[z_start:z_end, y_start:y_end, x_start:x_end]
+    raw_data = zarr_arr[z_start:z_end, y_start:y_end, x_start:x_end]
 
     # Compute padded indices with out-of-bounds checking
     z_padded_start = max(0, z_num - pad_amount)
@@ -174,8 +171,7 @@ def get_padded_data_zarr(cube_info, z_num, y_num, x_num, chunk_size, pad_amount)
     
     return padded_raw_data
 
-def get_padded_nrrd_data(folder_path, original_coords, pad_amount, chunk_size=256):
-    z, y, x = original_coords
+def get_padded_nrrd_data(folder_path, z, y, x, pad_amount, chunk_size=256):
     padded_raw_data = None
     missing_cubes = []
     
@@ -196,9 +192,9 @@ def get_padded_nrrd_data(folder_path, original_coords, pad_amount, chunk_size=25
     padded_raw_data = np.zeros((padded_size, padded_size, padded_size))
     
     for dz, dy, dx in neighbors:
-        neighbor_z = z + dz * chunk_size
-        neighbor_y = y + dy * chunk_size
-        neighbor_x = x + dx * chunk_size
+        neighbor_z = str(z + dz * chunk_size).zfill(5)
+        neighbor_y = str(y + dy * chunk_size).zfill(5)
+        neighbor_x = str(x + dx * chunk_size).zfill(5)
         
         filename = f"{neighbor_z}_{neighbor_y}_{neighbor_x}/{neighbor_z}_{neighbor_y}_{neighbor_x}_volume.nrrd"
         filepath = os.path.join(folder_path, filename)
