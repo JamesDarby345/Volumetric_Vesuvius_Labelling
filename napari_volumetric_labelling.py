@@ -80,6 +80,8 @@ except Exception as e:
     print(f"An unexpected error occurred with padded_raw_data: {e}")
     padded_raw_data = raw_data
 
+print(padded_raw_data.shape)
+
 # removes bright spots from the data, brightest 0.5% of the data
 bright_spot_masking = False
 if bright_spot_masking:
@@ -817,11 +819,11 @@ def connected_components(viewer):
     print(msg)
 
 #keybind j to add context padding to the data layer
-pad_key = 'j'
-#@viewer.bind_key(pad_key)
 def add_padding_contextual_data(viewer):
     global pad_state, previous_label_3d_data, manual_changes_mask
-
+    if padded_raw_data.shape == raw_data.shape:
+        print("No padding available")
+        return
     if pad_state:
         data = raw_data
         viewer.layers[data_name].data = data
@@ -878,7 +880,7 @@ def erode_labels(viewer):
         if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
             cut_label_at_oblique_plane(viewer, switch=False)
     else:
-        msg = f'please remove contextual padding with {pad_key} before eroding labels'
+        msg = f'please remove contextual padding before eroding labels'
         show_popup(msg)
         viewer.status = msg
         print(msg)
@@ -907,7 +909,7 @@ def dilate_labels(viewer):
         if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
             cut_label_at_oblique_plane(viewer, switch=False)
     else:
-        msg = f'please remove contextual padding with {pad_key} before dilating labels'
+        msg = f'please remove contextual padding before dilating labels'
         show_popup(msg)
         viewer.status = msg
         print(msg)
