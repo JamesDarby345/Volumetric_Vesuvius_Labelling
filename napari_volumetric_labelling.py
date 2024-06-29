@@ -68,15 +68,6 @@ else:
     padded_raw_data = zarr[z-pad_amount:z+chunk_size+pad_amount, y-pad_amount:y+chunk_size+pad_amount, x-pad_amount:x+chunk_size+pad_amount]
     data = raw_data
 
-
-# # Jordi's gross volumetric labels from blosc2
-# file_path = os.path.join(current_directory, 'data/s1_gross_labels.b2nd') #Change this to the path of the blosc2 file if using blosc2 labels
-# blosc2_full_array = blosc2.open(file_path, mode='r')
-
-# label_data = blosc2_full_array[z:z+chunk_size, y:y+chunk_size, x:x+chunk_size]
-# label_data = label_data * np.logical_not(bright_spot_mask(data))
-
-
 #If padded raw data isnt setup, just set it to raw_data
 if len(padded_raw_data) == 0:
     padded_raw_data = raw_data
@@ -130,6 +121,24 @@ if os.path.exists(compressed_path):
     data, _ = nrrd.read(compressed_path)
     viewer.add_labels(data, name=compressed_name)
 
+def apply_global_brush_size(viewer, source_layer=None):
+    global brush_size
+    for layer in viewer.layers:
+        if isinstance(layer, napari.layers.Labels) and layer != source_layer:
+            if layer.brush_size != brush_size:
+                layer.brush_size = brush_size
+
+def update_global_brush_size(event):
+    global brush_size
+    # The new brush size is stored in the layer, not in the event
+    brush_size = event.source.brush_size
+    # Pass the source layer to avoid updating it again
+    apply_global_brush_size(viewer, source_layer=event.source)
+
+def setup_brush_size_listener(viewer, layer_name):
+    labels_layer = viewer.layers[layer_name]
+    labels_layer.events.brush_size.connect(update_global_brush_size)
+
 #keybind l to switch to the data layer as the active layer
 #@viewer.bind_key('l')
 def switch_to_data_layer(viewer):
@@ -177,12 +186,8 @@ def decrease_brush_size(viewer):
     msg = 'decrease brush size'
     viewer.status = msg
     print(msg)
-    if label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-        viewer.layers[label_3d_name].brush_size = viewer.layers[label_3d_name].brush_size - 1
-        brush_size = viewer.layers[label_3d_name].brush_size
-    else:
-        labels_layer.brush_size = labels_layer.brush_size - 1
-        brush_size = labels_layer.brush_size
+    brush_size -= 1
+    apply_global_brush_size(viewer)
 
 #keybind e to increase the brush size of the labels layer
 #@viewer.bind_key('e')
@@ -191,12 +196,8 @@ def increase_brush_size(viewer):
     msg = 'increase brush size'
     viewer.status = msg
     print(msg)
-    if label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-        viewer.layers[label_3d_name].brush_size = viewer.layers[label_3d_name].brush_size + 1
-        brush_size = viewer.layers[label_3d_name].brush_size
-    else:
-        labels_layer.brush_size = labels_layer.brush_size + 1
-        brush_size = labels_layer.brush_size
+    brush_size += 1
+    apply_global_brush_size(viewer)
 
 #keybind s to toggle the show selected label only mode
 #@viewer.bind_key('s')
@@ -420,6 +421,8 @@ def shift_plane(layer, direction, padding_mode=False, padding=50):
 #@viewer.bind_key('b', overwrite=True)
 def full_label_view(viewer):
     global prev_camera_pos
+    if label_3d_name in viewer.layers:
+            update_label_from_3d(viewer)
     if viewer.dims.ndisplay == 2:
         viewer.dims.ndisplay = 3
         for layer in viewer.layers:
@@ -433,7 +436,6 @@ def full_label_view(viewer):
     else:
         prev_camera_pos = get_current_camera_info(viewer)
         viewer.dims.ndisplay = 2
-        #TODO update label layer from plane mode changes
         for layer in viewer.layers:
             if layer.name != label_3d_name:
                 viewer.layers[layer.name].visible = True
@@ -450,6 +452,8 @@ def full_label_view(viewer):
 #@viewer.bind_key('\\')
 def switch_to_plane_view(viewer):
     global prev_camera_pos
+    if label_3d_name in viewer.layers:
+            update_label_from_3d(viewer)
    # Switch to 3D mode
     if viewer.dims.ndisplay == 3:
         prev_camera_pos = get_current_camera_info(viewer)
@@ -493,8 +497,55 @@ def switch_to_plane_view(viewer):
         if prev_camera_pos is not None:
             set_camera_view(viewer, prev_camera_pos)
 
-def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=None):
-    global previous_label_3d_data, manual_changes_mask, prev_plane_info_var, erase_slice_width, brush_size, plane_shift_status
+def update_label_from_3d(viewer):
+    global previous_label_3d_data, manual_changes_mask
+
+    if label_3d_name in viewer.layers and label_name in viewer.layers:
+        existing_layer = viewer.layers[label_3d_name]
+        labels_layer = viewer.layers[label_name]
+
+        if isinstance(existing_layer, napari.layers.Labels):
+            # Calculate the manual changes mask
+            if previous_label_3d_data is not None and previous_label_3d_data.shape == existing_layer.data.shape:
+                manual_changes_mask = existing_layer.data != previous_label_3d_data
+            else:
+                manual_changes_mask = np.zeros_like(existing_layer.data, dtype=bool)
+            
+            # Apply the manual changes to the label_name layer
+            labels_layer.data[manual_changes_mask] = existing_layer.data[manual_changes_mask]
+            
+            # Refresh the viewer to immediately show the changes
+            labels_layer.refresh()
+
+def setup_label_3d_layer(viewer, new_label_data, active_mode):
+    global brush_size
+
+    # Remove the old label_3d_name layer if it exists
+    visible_state = True
+    if label_3d_name in viewer.layers:
+        visible_state = viewer.layers[label_3d_name].visible
+        viewer.layers.remove(viewer.layers[label_3d_name])
+    
+    # Add a new label layer with the updated data
+    viewer.add_labels(new_label_data, name=label_3d_name)
+    viewer.layers[label_3d_name].colormap = get_direct_label_colormap()
+    
+    new_label_layer = viewer.layers[label_3d_name]
+    new_label_layer.visible = visible_state
+    new_label_layer.blending = 'opaque'
+    new_label_layer.opacity = 1
+    new_label_layer.mode = active_mode
+    new_label_layer.brush_size = brush_size
+
+    setup_brush_size_listener(viewer, label_3d_name)
+
+    # Refresh the viewer to immediately show the changes
+    new_label_layer.refresh()
+
+    return new_label_layer
+
+def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=None, recut=False):
+    global previous_label_3d_data, manual_changes_mask, prev_plane_info_var, erase_slice_width, plane_shift_status
     plane_shift_status = False
     data_plane = viewer.layers[data_name]
     if data_plane.depiction != 'plane':
@@ -502,11 +553,10 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
         return
 
     active_mode = viewer.layers.selection.active.mode
-    #TODO: dig into if this is desired behaviour
     if prev_plane_info is not None:
         position = prev_plane_info['position']
         normal = prev_plane_info['normal']
-    elif erase_mode and prev_erase_plane_info_var is not None:
+    elif erase_mode and prev_erase_plane_info_var is not None and not recut:
         position = prev_erase_plane_info_var['position']
         normal = prev_erase_plane_info_var['normal']
     else:
@@ -525,18 +575,8 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     distances = (x - position[2]) * normal[2] + (y - position[1]) * normal[1] + (z - position[0]) * normal[0]
     labels_layer = viewer.layers[label_name]
 
-    # Check if the label_3d_name layer already exists
-    if label_3d_name in viewer.layers:
-        existing_layer = viewer.layers[label_3d_name]
-        if isinstance(existing_layer, napari.layers.Labels):
-            # Calculate the manual changes mask
-            if previous_label_3d_data is not None and previous_label_3d_data.shape == existing_layer.data.shape:
-                manual_changes_mask = existing_layer.data != previous_label_3d_data
-            else:
-                manual_changes_mask = np.zeros_like(existing_layer.data, dtype=bool)
-            
-            # Apply the manual changes to the label_name layer
-            labels_layer.data[manual_changes_mask] = existing_layer.data[manual_changes_mask]
+    # Update label_name layer from label_3d_name layer if it exists
+    update_label_from_3d(viewer)
 
     # Create a copy of the label data and set all voxels between the viewer and the plane to 0
     new_label_data = labels_layer.data.copy()
@@ -549,28 +589,11 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
         if erase_mode:
             new_label_data[distances > erase_slice_width + 0.5] = 0
 
-    # Remove the old label_3d_name layer if it exists
-    visible_state = True
-    if label_3d_name in viewer.layers:
-        visible_state = viewer.layers[label_3d_name].visible
-        viewer.layers.remove(viewer.layers[label_3d_name])
-    
-    # Add a new label layer with the updated data
-    viewer.add_labels(new_label_data, name=label_3d_name)
-    viewer.layers[label_3d_name].colormap = get_direct_label_colormap()
-    
-    new_label_layer = viewer.layers[label_3d_name]
-    new_label_layer.visible = visible_state
-    new_label_layer.blending = 'opaque'
-    new_label_layer.mode = active_mode
-    new_label_layer.brush_size = brush_size
+    # Setup the label_3d_name layer
+    setup_label_3d_layer(viewer, new_label_data, active_mode)
 
     # Store the current state of the label_3d_name layer for future comparison
     previous_label_3d_data = new_label_data.copy()
-
-    # Refresh the viewer to immediately show the changes
-    viewer.layers[label_name].refresh()
-    viewer.layers[label_3d_name].refresh()
 
 def plane_3d_erase_mode_shift_left(viewer):
     global erase_mode, prev_erase_plane_info_var
@@ -594,7 +617,7 @@ def shift_data_left_and_recut_3d_label(viewer):
     global erase_mode, cut_side
     shift_plane(viewer.layers[data_name], -1)
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
+        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side, recut=True)
 
 #@viewer.bind_key('Shift-Left', overwrite=True)
 def shift_data_left_fast_and_recut_3d_label(viewer):
@@ -604,7 +627,7 @@ def shift_data_left_fast_and_recut_3d_label(viewer):
     else:
         shift_plane(viewer.layers[data_name], -20)
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
+        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side, recut=True)
 
 #keybind Right arrow to shift the plane along the normal vector in 3d viewing mode
 #@viewer.bind_key('Right', overwrite=True)
@@ -612,7 +635,7 @@ def shift_data_right_and_recut_3d_label(viewer):
     global erase_mode, cut_side
     shift_plane(viewer.layers[data_name], 1)
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
+        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side, recut=True)
 
 #keybind Right arrow + shift to shift the plane along the normal vector 20 in 3d viewing mode
 #@viewer.bind_key('Shift-Right', overwrite=True)
@@ -623,7 +646,7 @@ def shift_data_right_fast_and_recut_3d_label(viewer):
     else:
         shift_plane(viewer.layers[data_name], 20)
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
+        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side, recut=True)
 
 # Define the functions to move left and right
 def move_left(viewer, distance=1):
@@ -696,7 +719,7 @@ def plane_erase_3d_mode(viewer, switch=True):
         erase_mode = True
     if switch and not plane_shift_status:
         cut_side = not cut_side
-    if viewer.dims.ndisplay == 3 and viewer.layers[data_name].depiction == 'plane':
+    if viewer.dims.ndisplay == 3 and viewer.layers[data_name].depiction == 'plane' and viewer.layers[data_name].visible:
         position = np.array(viewer.layers[data_name].plane.position)
         normal = np.array(viewer.layers[data_name].plane.normal)
         prev_erase_plane_info_var = {'position': position, 'normal': normal}
@@ -720,12 +743,9 @@ def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
         erase_mode = False
     if switch and not plane_shift_status:
         cut_side = not cut_side
-    if viewer.dims.ndisplay == 3 and viewer.layers[data_name].depiction == 'plane':
+    if viewer.dims.ndisplay == 3 and viewer.layers[data_name].depiction == 'plane' and viewer.layers[data_name].visible:
         cut_label_at_plane(viewer, erase_mode=False, cut_side=cut_side, prev_plane_info=prev_plane_info)
-        
         viewer.layers[label_3d_name].visible = True
-        viewer.layers[label_3d_name].blending = 'opaque'
-        viewer.layers[label_3d_name].refresh()
         viewer.layers[label_name].visible = False
 
 #run connected components on the labels layer to get instance segmentations
@@ -960,6 +980,7 @@ gui.setup_napari_defaults()
 
 bind_hotkeys(viewer, hotkey_config)
 set_camera_view(viewer)
+setup_brush_size_listener(viewer, label_name)
 
 # Start the Napari event loop
 napari.run()
