@@ -85,50 +85,13 @@ if bright_spot_masking:
 # Initialize the Napari viewer
 viewer = napari.Viewer()
 
-
-def dist_to_trans(quat, dist, translate_speed):
-    """Convert mouse x, y movement into x, y, z translations"""
-    rot, x, y, z = quat.get_axis_angle()
-    print(f"Rotation: {rot}, Axis: {x, y, z}")
-    rot_matrix = Quaternion.create_from_axis_angle(rot, x, y, z).get_matrix()[:3, :3]
-    dx, dz, dy = np.dot(rot_matrix, (dist[0], dist[1], 0.)) * translate_speed
-    return dx, dy, dz
-
 @viewer.mouse_drag_callbacks.append
 def pan_with_middle_mouse(viewer, event):
     if event.button == 3:  # Middle mouse button
         original_mode = viewer.layers.selection.active.mode
         viewer.layers.selection.active.mode = 'pan_zoom'
-
-        initial_pos = np.array(event.pos)
-        initial_center = np.array(viewer.camera.center)
-
         yield
         while event.type == 'mouse_move':
-            # Calculate the movement delta
-            delta = np.array(event.pos) - initial_pos
-            
-            # Get current camera properties
-            center = np.array(viewer.camera.center)
-            zoom = viewer.camera.zoom
-            angles = viewer.camera.angles
-            
-            # Convert Euler angles to quaternion
-            quat = Quaternion.create_from_euler_angles(*angles, degrees=True)
-            
-            # Convert mouse movement to camera space movement
-            translate_speed = 1.0 / zoom  # Adjust this value as needed
-            dx, dy, dz = dist_to_trans(quat, delta, translate_speed)
-            
-            # Update camera center
-            new_center = initial_center - np.array([dx, dy, dz])
-            viewer.camera.center = new_center
-            
-            print(f"Delta: {delta}")
-            print(f"Movement: {dx, dy, dz}")
-            print(f"Old center: {initial_center}")
-            print(f"New center: {new_center}")
-            
             yield
         viewer.layers.selection.active.mode = original_mode
 
