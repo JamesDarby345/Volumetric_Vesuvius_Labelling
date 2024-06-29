@@ -21,6 +21,7 @@ from vispy.util import keys
 from collections import deque
 import numba
 
+#monkey-patch the camera controls
 def patched_viewbox_mouse_event(self, event):
     if event.handled or not self.interactive:
         return
@@ -30,6 +31,8 @@ def patched_viewbox_mouse_event(self, event):
     if event.type == 'mouse_release':
         self._event_value = None  # Reset
     elif event.type == 'mouse_press':
+        print(event.pos)
+        self._event_value = event.pos[:2]  # Only take the first two values
         event.handled = True
     elif event.type == 'mouse_move':
         if event.press_event is None:
@@ -42,24 +45,24 @@ def patched_viewbox_mouse_event(self, event):
         p2 = event.mouse_event.pos
         d = p2 - p1
 
-        if 1 in event.buttons and not modifiers:
+        if (1 in event.buttons and not modifiers) or (2 in event.buttons and not modifiers):
             # Rotate
             self._update_rotation(event)
 
-        elif 2 in event.buttons and not modifiers:
-            # Zoom
-            if self._event_value is None:
-                self._event_value = (self._scale_factor, self._distance)
-            zoomy = (1 + self.zoom_factor) ** d[1]
+        # elif 2 in event.buttons and not modifiers:
+        #     # Zoom
+        #     if self._event_value is None:
+        #         self._event_value = (self._scale_factor, self._distance)
+        #     zoomy = (1 + self.zoom_factor) ** d[1]
 
-            self.scale_factor = self._event_value[0] * zoomy
-            # Modify distance if its given
-            if self._distance is not None:
-                self._distance = self._event_value[1] * zoomy
-            self.view_changed()
+        #     self.scale_factor = self._event_value[0] * zoomy
+        #     # Modify distance if its given
+        #     if self._distance is not None:
+        #         self._distance = self._event_value[1] * zoomy
+        #     self.view_changed()
 
         # This is the modified condition
-        elif 1 in event.buttons and keys.SHIFT in modifiers or 3 in event.buttons:
+        elif (1 in event.buttons and keys.SHIFT in modifiers) or 3 in event.buttons:
             # Translate
             norm = np.mean(self._viewbox.size)
             if self._event_value is None or len(self._event_value) == 2:

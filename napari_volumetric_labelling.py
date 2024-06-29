@@ -87,7 +87,7 @@ viewer = napari.Viewer()
 
 @viewer.mouse_drag_callbacks.append
 def pan_with_middle_mouse(viewer, event):
-    if event.button == 3:  # Middle mouse button
+    if event.button == 3 or event.button == 2:  # Middle mouse button or right click
         original_mode = viewer.layers.selection.active.mode
         viewer.layers.selection.active.mode = 'pan_zoom'
         yield
