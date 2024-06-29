@@ -61,3 +61,11 @@ customizable_hotkeys:
   toggle_show_selected_label: ""
   interpolate_borders: ""
   set_corner_view: ""
+
+"""
+Default Napari keybinds:
+o to cut the 3d plane off axis
+x,y,z to move the 3d plane to that axis
+[ and ] to increase/decrease brush size
+- and = to change selected label
+""""

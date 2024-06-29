@@ -74,7 +74,7 @@ else:
 
 #If padded raw data isnt setup, just set it to raw_data
 try:
-    if len(padded_raw_data) == 0:
+    if padded_raw_data is None or len(padded_raw_data) == 0:
         padded_raw_data = raw_data
 except Exception as e:
     print(f"An unexpected error occurred with padded_raw_data: {e}")
@@ -94,6 +94,9 @@ viewer = napari.Viewer()
 @viewer.mouse_drag_callbacks.append
 def pan_with_middle_mouse(viewer, event):
     if event.button == 3 or event.button == 2 or (event.button == 1 and keys.SHIFT in event.modifiers):  # Middle mouse button or right click
+        if viewer.layers.selection.active is None:
+            viewer.layers.selection.active = viewer.layers[label_name]
+            viewer.layers[label_name].mode = 'pan_zoom'
         original_mode = viewer.layers.selection.active.mode
         viewer.layers.selection.active.mode = 'pan_zoom'
         yield
@@ -422,7 +425,6 @@ def shift_plane(layer, direction, padding_mode=False, padding=50):
         
         # Update the plane position
         layer.plane.position = tuple(new_position)
-        print(f"Shifted plane to: new position = {new_position}")
     elif viewer.dims.ndisplay == 2:
         # If in 2D mode, shift the slice by 1
         current_step = viewer.dims.current_step[0]
@@ -431,7 +433,6 @@ def shift_plane(layer, direction, padding_mode=False, padding=50):
         else:
             new_step = current_step + direction
         viewer.dims.set_current_step(0, new_step)
-        print(f"Shifted 2D slice to: {new_step}")
     else:
         print("Cannot shift: not in plane mode or 2D view")
 
@@ -569,8 +570,10 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     if data_plane.depiction != 'plane':
         print("Please switch to plane mode by pressing '\\' key.")
         return
-
-    active_mode = viewer.layers.selection.active.mode
+    if viewer.layers.selection.active is not None:
+        active_mode = viewer.layers.selection.active.mode
+    else:
+        active_mode = 'pan_zoom'
     if prev_plane_info is not None:
         position = prev_plane_info['position']
         normal = prev_plane_info['normal']
