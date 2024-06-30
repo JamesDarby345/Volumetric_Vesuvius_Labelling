@@ -36,6 +36,9 @@ def patched_viewbox_mouse_event(self, event):
             return
         if 1 in event.buttons and 2 in event.buttons:
             return
+        #temp
+        if 2 in event.buttons and keys.SHIFT in modifiers:
+            return
 
         modifiers = event.mouse_event.modifiers
         p1 = event.mouse_event.press_event.pos[:2] # Only take the first two values

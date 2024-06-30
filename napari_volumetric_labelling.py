@@ -94,9 +94,9 @@ viewer = napari.Viewer()
 label_name = 'Labels'
 data_name = 'Data'
 compressed_name = 'Compressed Regions'
-ff_name = 'flood_fill_layer'
+ff_name = 'Flood Fill'
+cc_preview_name = 'Connected Components Preview'
 label_3d_name = '3D Label Edit Layer'
-erase_plane_cc_name = 'Erase Plane Connected Components'
 compressed_class = 254
 pad_state = False
 erase_mode = False
@@ -456,7 +456,7 @@ def full_label_view(viewer):
         prev_camera_pos = get_current_camera_info(viewer)
         viewer.dims.ndisplay = 2
         for layer in viewer.layers:
-            if layer.name != label_3d_name:
+            if layer.name != label_3d_name and layer.name != cc_preview_name:
                 viewer.layers[layer.name].visible = True
             else:
                 viewer.layers[layer.name].visible = False
@@ -478,7 +478,7 @@ def switch_to_plane_view(viewer):
         prev_camera_pos = get_current_camera_info(viewer)
         viewer.dims.ndisplay = 2
         for layer in viewer.layers:
-            if layer.name != label_3d_name:
+            if layer.name != label_3d_name and layer.name != cc_preview_name:
                 viewer.layers[layer.name].visible = True
             else:
                 viewer.layers[layer.name].visible = False
@@ -773,15 +773,17 @@ def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
 
 #run connected components on the labels layer to get instance segmentations
 #@viewer.bind_key('c')
-def connected_components(viewer):
+def connected_components(viewer, preview=False):
     global erase_mode, cut_side
     msg = 'connected components'
     viewer.status = msg
     print(msg)
-    msg = "DANGER Are you sure you want to run connected components? This operation cannot be undone and removes the undo queue. Consider saving first. \n\nIF YOU HAVE DILATED SEPERATED LABELS AND THEY NOW TOUCH, THEY WILL BE COMBINED."
-    response = confirm_popup(msg)
-    if response != QMessageBox.Yes:
-            return 
+    if not preview:
+        msg = "DANGER Are you sure you want to run connected components? This operation cannot be undone and removes the undo queue. Consider saving first. \n\nIF YOU HAVE DILATED SEPERATED LABELS AND THEY NOW TOUCH, THEY WILL BE COMBINED."
+        response = confirm_popup(msg)
+        if response != QMessageBox.Yes:
+                return 
+    
 
     #mask for the compressed class from the labels layer
     mask = (labels_layer.data == compressed_class)
@@ -806,15 +808,34 @@ def connected_components(viewer):
     if label_3d_name in viewer.layers:
         update_label_from_3d(viewer)
 
-    #connected components data with both layer's borders removed
-    cc_data = labels_layer.data.copy()
+    if label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible and preview:
+        cc_data = viewer.layers[label_3d_name].data.copy()
+    else:
+        cc_data = labels_layer.data.copy()
     cc_data[mask] = 0
+    print(np.sum(cc_data > 0))
 
-    labels_layer.data = label_foreground_structures_napari(cc_data, compressed_class=compressed_class, min_size=200)
+    cc_result = label_foreground_structures_napari(cc_data, compressed_class=compressed_class, min_size=200)
+    
+    if preview:
+        if cc_preview_name in viewer.layers:
+            viewer.layers[cc_preview_name].data = cc_result
+        else:
+            viewer.add_labels(cc_result, name=cc_preview_name)
+        viewer.layers[cc_preview_name].visible = True
+        viewer.layers[cc_preview_name].colormap = get_direct_label_colormap()
+        viewer.layers[cc_preview_name].editable = False
+        viewer.layers[label_name].visible = False
+        if label_3d_name in viewer.layers:
+            viewer.layers[label_3d_name].visible = False
+    else:
+        labels_layer.data = cc_result
+    
     if label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
     msg = 'connected components finished'
-    show_popup(msg)
+    if not preview:
+        show_popup(msg)
     viewer.status = msg
     print(msg)
 
@@ -939,6 +960,17 @@ def save_labels(viewer):
         nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_compressed_regions.nrrd"), viewer.layers[compressed_name].data)
     msg = f"Layers saved to {output_path}"
     show_popup(msg)
+
+def connected_components_preview(viewer):
+    if cc_preview_name in viewer.layers and viewer.layers[cc_preview_name].visible:
+        viewer.layers[cc_preview_name].visible = False
+        if label_3d_name in viewer.layers:
+            viewer.layers[label_3d_name].visible = True
+        else:
+            viewer.layers[label_name].visible = True
+    else:
+        connected_components(viewer, preview=True)
+    
 
 def bind_hotkeys(viewer, config, module=None, overwrite=True):
     if module is None:
