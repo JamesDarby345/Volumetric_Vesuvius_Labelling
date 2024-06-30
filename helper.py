@@ -38,8 +38,8 @@ def patched_viewbox_mouse_event(self, event):
             return
 
         modifiers = event.mouse_event.modifiers
-        p1 = event.mouse_event.press_event.pos
-        p2 = event.mouse_event.pos
+        p1 = event.mouse_event.press_event.pos[:2] # Only take the first two values
+        p2 = event.mouse_event.pos[:2] # Only take the first two values
         d = p2 - p1
 
         if (1 in event.buttons and not modifiers) or (2 in event.buttons and not modifiers):
@@ -76,14 +76,19 @@ def patched_viewbox_mouse_event(self, event):
             c = self._event_value
             self.center = c[0] + dx, c[1] + dy, c[2] + dz
 
-        elif 2 in event.buttons and keys.SHIFT in modifiers:
-            # Change fov
-            if self._event_value is None:
-                self._event_value = self._fov
-            fov = self._event_value - d[1] / 5.0
-            self.fov = min(180.0, max(0.0, fov))
-
-Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
+        # elif 2 in event.buttons and keys.SHIFT in modifiers:
+        #     p1 = event.mouse_event.press_event.pos 
+        #     p2 = event.mouse_event.pos 
+        #     d = p2 - p1
+        #     # Change fov
+        #     print("abcd", self._event_value)
+        #     print(self._fov)
+        #     print(d[1])
+        #     # exit()
+        #     if self._event_value is None:
+        #         self._event_value = self._fov
+        #     fov = self._event_value - d[1] / 5.0
+        #     self.fov = min(180.0, max(0.0, fov))
 
 @numba.jit(nopython=True, parallel=True)
 def numba_dilation_3d_labels(data, iterations):
@@ -132,43 +137,33 @@ def get_padded_data_zarr(zarr_arr, z_num, y_num, x_num, chunk_size, pad_amount):
     # Get the shape of the zarr array
     z_shape, y_shape, x_shape = zarr_arr.shape
 
-    # Compute indices with out-of-bounds checking
-    z_start = max(0, z_num)
-    z_end = min(z_shape, z_num + chunk_size)
-    y_start = max(0, y_num)
-    y_end = min(y_shape, y_num + chunk_size)
-    x_start = max(0, x_num)
-    x_end = min(x_shape, x_num + chunk_size)
+    # Initialize the output array with zeros
+    output_size = chunk_size + 2 * pad_amount
+    padded_raw_data = np.zeros((output_size, output_size, output_size))
 
+    # Compute indices for the zarr array
+    z_start = max(0, z_num - pad_amount)
+    z_end = min(z_shape, z_num + chunk_size + pad_amount)
+    y_start = max(0, y_num - pad_amount)
+    y_end = min(y_shape, y_num + chunk_size + pad_amount)
+    x_start = max(0, x_num - pad_amount)
+    x_end = min(x_shape, x_num + chunk_size + pad_amount)
+
+    # Get data from zarr array
     raw_data = zarr_arr[z_start:z_end, y_start:y_end, x_start:x_end]
 
-    # Compute padded indices with out-of-bounds checking
-    z_padded_start = max(0, z_num - pad_amount)
-    z_padded_end = min(z_shape, z_num + chunk_size + pad_amount)
-    y_padded_start = max(0, y_num - pad_amount)
-    y_padded_end = min(y_shape, y_num + chunk_size + pad_amount)
-    x_padded_start = max(0, x_num - pad_amount)
-    x_padded_end = min(x_shape, x_num + chunk_size + pad_amount)
+    # Compute indices for placing data in the output array
+    z_out_start = max(0, pad_amount - (z_num - z_start))
+    y_out_start = max(0, pad_amount - (y_num - y_start))
+    x_out_start = max(0, pad_amount - (x_num - x_start))
 
-    padded_raw_data = np.zeros((z_padded_end - z_padded_start,
-                                y_padded_end - y_padded_start,
-                                x_padded_end - x_padded_start))
+    # Place the data in the output array
+    padded_raw_data[
+        z_out_start:z_out_start + (z_end - z_start),
+        y_out_start:y_out_start + (y_end - y_start),
+        x_out_start:x_out_start + (x_end - x_start)
+    ] = raw_data
 
-    # Fill the valid region of the padded array
-    z_slice = slice(z_padded_start, z_padded_end)
-    y_slice = slice(y_padded_start, y_padded_end)
-    x_slice = slice(x_padded_start, x_padded_end)
-    
-    z_paste_start = max(0, pad_amount - z_num)
-    y_paste_start = max(0, pad_amount - y_num)
-    x_paste_start = max(0, pad_amount - x_num)
-    
-    z_paste_end = z_paste_start + (z_end - z_start)
-    y_paste_end = y_paste_start + (y_end - y_start)
-    x_paste_end = x_paste_start + (x_end - x_start)
-
-    padded_raw_data[z_paste_start:z_paste_end, y_paste_start:y_paste_end, x_paste_start:x_paste_end] = raw_data
-    
     return padded_raw_data
 
 def get_padded_nrrd_data(folder_path, z, y, x, pad_amount, chunk_size=256):

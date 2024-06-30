@@ -6,13 +6,11 @@ import zarr
 from helper import *
 from gui_components import VesuviusGUI
 from napari.layers import Image
-from scipy.ndimage import binary_dilation, binary_erosion
+from scipy.ndimage import binary_erosion
 from qtpy.QtWidgets import QMessageBox
-from qtpy.QtCore import QTimer, Qt
+from qtpy.QtCore import QTimer
 from napari.qt.threading import thread_worker
 from napari.utils.notifications import show_info
-from napari.utils.interactions import mouse_press_callbacks, mouse_move_callbacks, mouse_release_callbacks
-from vispy.util.quaternion import Quaternion
 import yaml
 from pathlib import Path
 import sys
