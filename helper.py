@@ -13,7 +13,7 @@ import nrrd
 from qtpy.QtWidgets import QMessageBox
 from napari.utils.colormaps import DirectLabelColormap
 from collections import defaultdict
-from vispy.scene.cameras.perspective import PerspectiveCamera, Base3DRotationCamera
+from vispy.scene.cameras.perspective import PerspectiveCamera
 from vispy.util import keys
 from collections import deque
 import numba
@@ -32,6 +32,7 @@ def patched_viewbox_mouse_event(self, event):
         self._event_value = event.pos[:2]  # Only take the first two values
         event.handled = True
     elif event.type == 'mouse_move':
+        modifiers = event.mouse_event.modifiers
         if event.press_event is None:
             return
         if 1 in event.buttons and 2 in event.buttons:
@@ -40,7 +41,6 @@ def patched_viewbox_mouse_event(self, event):
         if 2 in event.buttons and keys.SHIFT in modifiers:
             return
 
-        modifiers = event.mouse_event.modifiers
         p1 = event.mouse_event.press_event.pos[:2] # Only take the first two values
         p2 = event.mouse_event.pos[:2] # Only take the first two values
         d = p2 - p1
