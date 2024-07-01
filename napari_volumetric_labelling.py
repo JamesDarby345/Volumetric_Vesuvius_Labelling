@@ -945,6 +945,10 @@ def save_labels(viewer):
     msg = 'save labels'
     viewer.status = msg
     print(msg)
+    if viewer.layers[label_name].data.shape[0] != chunk_size:
+        msg = "please remove addtional context padding before saving"
+        show_popup(msg)
+        return
     current_directory = os.getcwd()
     file_path = f'output/volumetric_labels_{scroll_name}/{z}_{y}_{x}'
     output_path = os.path.join(current_directory, file_path)

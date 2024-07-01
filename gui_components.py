@@ -138,11 +138,10 @@ class VesuviusGUI:
         viewer = self.viewer
         label_name = 'Labels'
         data_name = 'Data'
-        compressed_name = 'Compressed Regions'
         ff_name = 'flood_fill_layer'
         label_3d_name = '3D Label Edit Layer'
         self.viewer.axes.visible = True
-        self.viewer.dims.ndisplay = 3
+        self.viewer.dims.ndisplay = 3   
         labels_layer = self.viewer.layers[self.get_label_layer_name()]
         labels_layer.n_edit_dimensions = 3
         labels_layer.opacity = 1
