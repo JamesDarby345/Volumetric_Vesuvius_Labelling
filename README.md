@@ -12,7 +12,7 @@ To provide custom tooling and extensions to the Napari 3d viewer that will help 
 -Connected Components seperation and preview<br>
 -Editable Hotkeys specific to the target task for switching between modes, tools and views to increase speed & fluidity of work<br>
 
-Watch the tutorial video on how to use available here: https://dl.ash2txt.org/community-uploads/james/Updated_Napari_Volumetric_Cube_Labeling_Tutorial.mp4 <br>
+Watch the tutorial video on how to use available here: https://dl.ash2txt.org/community-uploads/james/Updated_Napari_Volumetric_Labeling_Tutorial.mp4 <br>
 
 ## Install with conda & setup instructions:
 
