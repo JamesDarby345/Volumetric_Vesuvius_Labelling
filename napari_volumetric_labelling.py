@@ -626,7 +626,7 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
 
 def plane_3d_erase_mode_shift_left(viewer):
     global erase_mode, prev_erase_plane_info_var, erase_slice_width
-    overlap = erase_slice_width//10
+    overlap = erase_slice_width//5
     if erase_mode:
         shift_prev_erase_plane(-erase_slice_width+overlap)
         shift_plane(viewer.layers[data_name], -erase_slice_width+overlap)
@@ -635,7 +635,7 @@ def plane_3d_erase_mode_shift_left(viewer):
 
 def plane_3d_erase_mode_shift_right(viewer):
     global erase_mode, prev_erase_plane_info_var, erase_slice_width
-    overlap = erase_slice_width//10
+    overlap = erase_slice_width//5
     if erase_mode:
         shift_prev_erase_plane(erase_slice_width-overlap)
         shift_plane(viewer.layers[data_name], erase_slice_width-overlap)
