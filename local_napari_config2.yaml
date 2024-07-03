@@ -1,14 +1,17 @@
 cube_info:
 #cube z,y,x coords to load correct raw data & mask cubes
-  z: '00000'
-  y: '00000'
-  x: '00000'
+  z: '07376'
+  y: '03024'
+  x: '04048'
+  # z: '02000'
+  # y: '02000'
+  # x: '02000'
   scroll_name: 's1'
   chunk_size: 256
   pad_amount: 100
   brush_size: 4
-  use_zarr: False #True if using zarr for raw data instead of nrrd cubes, will still need nrrd mask cubes
-  zarr_path: '/path/to/file.zarr'
+  use_zarr: True #True if using zarr for raw data instead of nrrd cubes, will still need nrrd mask cubes
+  zarr_path: '/Volumes/16TB_RAID_0/Scroll1/Scroll1.zarr'
 #Napari default keybinds will overwrite the custom keybinds in some modes
 #Thus, it is recommended to not use the default keybinds for custom keybinds
 #Keys with default functions include:
