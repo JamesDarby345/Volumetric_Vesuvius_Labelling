@@ -18,6 +18,9 @@ from collections import namedtuple
 from vispy.scene.cameras.perspective import Base3DRotationCamera
 from vispy.util import keys
 
+from napari_threedee.visualization._qt.qt_lighting_control import QtLightingControlWidget
+
+
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
 
 
@@ -110,6 +113,11 @@ erase_slice_width = 30
 # Add the 3D data to the viewer
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
 labels_layer = viewer.add_labels(label_data, name=label_name)
+
+# viewer.window.add_plugin_dock_widget(
+#     plugin_name="napari-threedee", widget_name="render plane manipulator"
+# )
+
 
 #load saved labels and compressed labels if they exist
 file_path = f'output/volumetric_labels_{scroll_name}/'

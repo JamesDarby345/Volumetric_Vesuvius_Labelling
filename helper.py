@@ -38,8 +38,8 @@ def patched_viewbox_mouse_event(self, event):
         if 1 in event.buttons and 2 in event.buttons:
             return
         #temp
-        if 2 in event.buttons and keys.SHIFT in modifiers:
-            return
+        # if 2 in event.buttons and keys.SHIFT in modifiers:
+        #     return
 
         p1 = event.mouse_event.press_event.pos[:2] # Only take the first two values
         p2 = event.mouse_event.pos[:2] # Only take the first two values
@@ -62,7 +62,7 @@ def patched_viewbox_mouse_event(self, event):
         #     self.view_changed()
 
         # This is the modified condition
-        elif (1 in event.buttons and keys.SHIFT in modifiers) or 3 in event.buttons:
+        elif (1 in event.buttons and keys.SHIFT in modifiers) or 3 in event.buttons or (2 in event.buttons and keys.SHIFT in modifiers):
             # Translate
             norm = np.mean(self._viewbox.size)
             if self._event_value is None or len(self._event_value) == 2:
