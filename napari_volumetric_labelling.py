@@ -55,12 +55,15 @@ raw_data = None
 data = None
 
 nrrd_cube_path = os.path.join(current_directory, 'data/nrrd_cubes') #Change to the path of the folder containing the nrrd cubes
-original_label_data, label_header = nrrd.read(nrrd_cube_path+f'/{z}_{y}_{x}/{z}_{y}_{x}_mask.nrrd')
+# Construct the file path using os.path.join
+mask_file_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}', f'{z}_{y}_{x}_mask.nrrd')
+original_label_data, label_header = nrrd.read(mask_file_path)
 label_data = original_label_data
 
 #nrrd zyx coord cubes
 if not use_zarr:
-    raw_data, _ = nrrd.read(nrrd_cube_path+f'/{z}_{y}_{x}/{z}_{y}_{x}_volume.nrrd')
+    volume_file_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}', f'{z}_{y}_{x}_volume.nrrd')
+    raw_data, _ = nrrd.read(volume_file_path)
     padded_raw_data = get_padded_nrrd_data(nrrd_cube_path, z, y, x, pad_amount)
     data = raw_data
 else:
@@ -116,8 +119,8 @@ labels_layer = viewer.add_labels(label_data, name=label_name)
 # )
 
 #load saved labels if they exist
-file_path = f'output/volumetric_labels_{scroll_name}/'
-label_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}/{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
+file_path = os.path.join('output',f'volumetric_labels_{scroll_name}')
+label_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}",f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
 if os.path.exists(label_path):
     label_data, label_header = nrrd.read(label_path)
     if bright_spot_masking:
@@ -932,7 +935,7 @@ def save_labels(viewer):
         show_popup(msg)
         return
     current_directory = os.getcwd()
-    file_path = f'output/volumetric_labels_{scroll_name}/{z}_{y}_{x}'
+    file_path = os.path.join('output',f'volumetric_labels_{scroll_name}/{z}_{y}_{x}')
     output_path = os.path.join(current_directory, file_path)
     if not os.path.exists(output_path):
         os.makedirs(output_path)
