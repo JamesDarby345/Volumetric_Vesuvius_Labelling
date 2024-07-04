@@ -18,6 +18,19 @@ from vispy.util import keys
 from collections import deque
 import numba
 import zarr 
+import ast
+
+def ensure_list(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            # Try to parse the string as a list
+            return ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            # If it's not a valid list representation, wrap it in a list
+            return [value]
+    return [value] if value is not None else []
 
 #monkey-patch the camera controls
 def patched_viewbox_mouse_event(self, event):
@@ -38,8 +51,8 @@ def patched_viewbox_mouse_event(self, event):
         if 1 in event.buttons and 2 in event.buttons:
             return
         #temp
-        if 2 in event.buttons and keys.SHIFT in modifiers:
-            return
+        # if 2 in event.buttons and keys.SHIFT in modifiers:
+        #     return
 
         p1 = event.mouse_event.press_event.pos[:2] # Only take the first two values
         p2 = event.mouse_event.pos[:2] # Only take the first two values
@@ -62,7 +75,7 @@ def patched_viewbox_mouse_event(self, event):
         #     self.view_changed()
 
         # This is the modified condition
-        elif (1 in event.buttons and keys.SHIFT in modifiers) or 3 in event.buttons:
+        elif (1 in event.buttons and keys.SHIFT in modifiers) or 3 in event.buttons or (2 in event.buttons and keys.SHIFT in modifiers):
             # Translate
             norm = np.mean(self._viewbox.size)
             if self._event_value is None or len(self._event_value) == 2:
@@ -277,10 +290,9 @@ def limited_bfs_flood_fill(data, start_coords, max_distance):
 
     return filled
 
-def label_foreground_structures_napari(input_array, min_size=1000, compressed_class=254):
+def label_foreground_structures_napari(input_array, min_size=1000):
     # Find connected components in the foreground (value 2)
     foreground = input_array > 0
-    foreground[foreground == compressed_class] = 0
 
     # Label connected components
     labeled_array, num_features = scipy.ndimage.label(foreground)
@@ -300,48 +312,8 @@ def label_foreground_structures_napari(input_array, min_size=1000, compressed_cl
 
     print(f"Number of connected foreground structures before filtering: {num_features}")
     print(f"Number of connected foreground structures after filtering: {np.max(labeled_array)}")
-    
-    labeled_array[input_array == compressed_class] = compressed_class # Add the border class back in
 
     return labeled_array
-
-def interpolate_slices(raw_data, compressed_class=254):
-    # Find the indices of slices that have annotations
-    data = raw_data.copy()
-    data[data != compressed_class] = 0
-    print(np.sum(data))
-    annotated_slices = np.any(data, axis=(1, 2))
-    annotated_indices = np.where(annotated_slices)[0]
-
-    # Interpolated data initialization
-    interpolated_data = np.zeros_like(data)
-
-    # Iterate through each annotated slice
-    for i in range(len(annotated_indices) - 1):
-        start_idx = annotated_indices[i]
-        end_idx = annotated_indices[i + 1]
-
-        if end_idx - start_idx > 10:  # Skip if the gap is larger than 10 slices
-            print(f"Skipping interpolation between slices {start_idx} and {end_idx}")
-            continue
-
-        # Define the range of slices to interpolate
-        slice_range = np.arange(max(start_idx - 2, 0), min(end_idx + 3, data.shape[0]))
-
-        # Interpolation function for each pixel in the range
-        for x in range(data.shape[1]):
-            for y in range(data.shape[2]):
-                values = data[slice_range, x, y]
-                mask = values > 0
-                if np.sum(mask) > 1:
-                    interp_func = interp1d(slice_range[mask], values[mask], kind='linear', fill_value="extrapolate")
-                    interpolated_data[slice_range, x, y] = interp_func(slice_range)
-
-                        
-    # structure = np.ones((3, 3, 3))  # Define the structure for closing
-    # interpolated_data = binary_closing(interpolated_data, structure=structure).astype(interpolated_data.dtype)
-    interpolated_data[interpolated_data != 0] = compressed_class
-    return interpolated_data
 
 def bright_spot_mask(data):
     # Calculate the threshold for the top 0.1% brightest voxels

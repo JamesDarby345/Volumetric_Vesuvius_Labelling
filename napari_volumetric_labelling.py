@@ -17,9 +17,10 @@ import sys
 from collections import namedtuple
 from vispy.scene.cameras.perspective import Base3DRotationCamera
 from vispy.util import keys
+from datetime import datetime
+from collections import defaultdict
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
-
 
 def read_config(config_path='napari_config.yaml'):
     config_path = Path(config_path)
@@ -43,6 +44,7 @@ x_num = int(x)
 chunk_size = cube_info.get('chunk_size', 256)
 pad_amount = cube_info.get('pad_amount', 100)
 brush_size = cube_info.get('brush_size', 4)
+author = cube_info.get('author', '-')
 
 current_directory = os.getcwd()
 pad_state = False
@@ -53,7 +55,7 @@ raw_data = None
 data = None
 
 nrrd_cube_path = os.path.join(current_directory, 'data/nrrd_cubes') #Change to the path of the folder containing the nrrd cubes
-original_label_data, _ = nrrd.read(nrrd_cube_path+f'/{z}_{y}_{x}/{z}_{y}_{x}_mask.nrrd')
+original_label_data, label_header = nrrd.read(nrrd_cube_path+f'/{z}_{y}_{x}/{z}_{y}_{x}_mask.nrrd')
 label_data = original_label_data
 
 #nrrd zyx coord cubes
@@ -93,11 +95,9 @@ viewer = napari.Viewer()
 #layer name variables
 label_name = 'Labels'
 data_name = 'Data'
-compressed_name = 'Compressed Regions'
 ff_name = 'Flood Fill'
 cc_preview_name = 'Connected Components Preview'
 label_3d_name = '3D Label Edit Layer'
-compressed_class = 254
 pad_state = False
 erase_mode = False
 cut_side = True
@@ -111,22 +111,29 @@ erase_slice_width = 30
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
 labels_layer = viewer.add_labels(label_data, name=label_name)
 
-#load saved labels and compressed labels if they exist
+# viewer.window.add_plugin_dock_widget(
+#     plugin_name="napari-threedee", widget_name="render plane manipulator"
+# )
+
+#load saved labels if they exist
 file_path = f'output/volumetric_labels_{scroll_name}/'
 label_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}/{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
 if os.path.exists(label_path):
-    label_data, _ = nrrd.read(label_path)
+    label_data, label_header = nrrd.read(label_path)
     if bright_spot_masking:
         label_data = label_data * np.logical_not(bright_spot_mask(data))
     # label_data = np.pad(label_data, pad_width=1, mode='constant', constant_values=0)
     labels_layer.data = label_data
+print(label_header)
+label_header = defaultdict(list, label_header)
+for key in ['saved_timestamps', 'open_timestamps']:
+    label_header[key] = ensure_list(label_header[key])
+# Now you can simply append the new timestamp
+label_header['open_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+if 'author' not in label_header and author is not None and author != '':
+    label_header['author'] = author
 
 padded_labels = np.pad(label_data, pad_width=pad_amount, mode='constant', constant_values=0)
-
-compressed_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_compressed_regions.nrrd")
-if os.path.exists(compressed_path):
-    data, _ = nrrd.read(compressed_path)
-    viewer.add_labels(data, name=compressed_name)
 
 @viewer.mouse_drag_callbacks.append
 def pan_with_middle_mouse(viewer, event):
@@ -165,15 +172,6 @@ def setup_brush_size_listener(viewer, layer_name):
 def switch_to_data_layer(viewer):
     viewer.layers[data_name].visible = True
     viewer.layers.selection.active = viewer.layers[data_name]
-    
-#keybind v to toggle settings to draw the compressed region class brush
-#@viewer.bind_key('v')
-def draw_compressed_class(viewer):
-    msg = 'draw compressed class'
-    viewer.status = msg
-    print(msg)
-    labels_layer.selected_label = compressed_class
-    labels_layer.mode = 'paint'
 
 #keybind r to toggle the labels layer visibility
 #@viewer.bind_key('r')
@@ -250,22 +248,6 @@ def capture_cursor_info(event):
 #@viewer.bind_key('w')
 def label_picker(event):
     capture_cursor_info(event)
-
-#keybind x to run the new compressed label interpolation function
-#@viewer.bind_key('x')
-def interpolate_borders(viewer):
-    msg = "Are you sure you want to interpolate the compressed region class? This operation cannot be undone and removes the undo queue. It may also take a few seconds to minutes."
-    response = confirm_popup(msg)
-    if response != QMessageBox.Yes:
-            return 
-    msg = 'interpolating borders'
-    viewer.status = msg
-    print(msg)
-    interpolated_borders = interpolate_slices(labels_layer.data, compressed_class)
-    if compressed_name in viewer.layers:
-        viewer.layers[compressed_name].data = interpolated_borders
-    else:
-        viewer.add_labels(interpolated_borders, name=compressed_name)
 
 # Add an empty labels layer for the flood fill result
 flood_fill_layer = viewer.add_labels(np.zeros_like(data), name=ff_name)
@@ -618,7 +600,7 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
 
 def plane_3d_erase_mode_shift_left(viewer):
     global erase_mode, prev_erase_plane_info_var, erase_slice_width
-    overlap = erase_slice_width//10
+    overlap = erase_slice_width//5
     if erase_mode:
         shift_prev_erase_plane(-erase_slice_width+overlap)
         shift_plane(viewer.layers[data_name], -erase_slice_width+overlap)
@@ -627,7 +609,7 @@ def plane_3d_erase_mode_shift_left(viewer):
 
 def plane_3d_erase_mode_shift_right(viewer):
     global erase_mode, prev_erase_plane_info_var, erase_slice_width
-    overlap = erase_slice_width//10
+    overlap = erase_slice_width//5
     if erase_mode:
         shift_prev_erase_plane(erase_slice_width-overlap)
         shift_plane(viewer.layers[data_name], erase_slice_width-overlap)
@@ -783,26 +765,6 @@ def connected_components(viewer, preview=False):
         response = confirm_popup(msg)
         if response != QMessageBox.Yes:
                 return 
-    
-
-    #mask for the compressed class from the labels layer
-    mask = (labels_layer.data == compressed_class)
-    old_borders = np.zeros_like(labels_layer.data)
-    old_borders[labels_layer.data == compressed_class] = compressed_class
-
-    #new borders from the compressed layer and labels layer
-    if compressed_name in viewer.layers:
-        compressed_label = viewer.layers[compressed_name].data
-        new_borders = compressed_label  | old_borders
-        new_borders[new_borders > 0] = compressed_class
-        
-        mask_2 = (compressed_label  == compressed_class)
-        mask = mask | mask_2
-        
-        viewer.layers[compressed_name].data = new_borders
-    else:
-        new_borders = old_borders
-        viewer.add_labels(new_borders, name=compressed_name)
 
     #apply any changes to the label_3d_name layer to the labels layer
     if label_3d_name in viewer.layers:
@@ -812,10 +774,9 @@ def connected_components(viewer, preview=False):
         cc_data = viewer.layers[label_3d_name].data.copy()
     else:
         cc_data = labels_layer.data.copy()
-    cc_data[mask] = 0
     print(np.sum(cc_data > 0))
 
-    cc_result = label_foreground_structures_napari(cc_data, compressed_class=compressed_class, min_size=200)
+    cc_result = label_foreground_structures_napari(cc_data, min_size=200)
     
     if preview:
         if cc_preview_name in viewer.layers:
@@ -939,7 +900,7 @@ def dilate_labels(viewer):
     viewer.status = msg
     print(msg)
 
-#Keybind h to save the labels, raw and compressed class layer
+#Keybind h to save the labels and raw layers
 #@viewer.bind_key('h')
 def save_labels(viewer):
     msg = 'save labels'
@@ -957,11 +918,10 @@ def save_labels(viewer):
     print(labels_layer.data.shape, labels_layer.data.dtype)
     if label_3d_name in viewer.layers:
         update_label_from_3d(viewer)
-    
-    nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), labels_layer.data)
+    label_header['saved_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    save_header = dict(label_header)
+    nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), labels_layer.data, header=save_header)
     nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_raw.nrrd"), viewer.layers[data_name].data)
-    if compressed_name in viewer.layers:
-        nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_compressed_regions.nrrd"), viewer.layers[compressed_name].data)
     msg = f"Layers saved to {output_path}"
     show_popup(msg)
 

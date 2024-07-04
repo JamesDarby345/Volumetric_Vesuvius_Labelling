@@ -9,6 +9,7 @@ cube_info:
   brush_size: 4
   use_zarr: False #True if using zarr for raw data instead of nrrd cubes, will still need nrrd mask cubes
   zarr_path: '/path/to/file.zarr'
+  author: ''
 #Napari default keybinds will overwrite the custom keybinds in some modes
 #Thus, it is recommended to not use the default keybinds for custom keybinds
 #Keys with default functions include:
@@ -55,10 +56,8 @@ customizable_hotkeys:
   dilate_labels: "u"
   connected_components: "'"
   save_labels: "h"
-  draw_compressed_class: "b"
   decrease_brush_size: "Shift-z"
   increase_brush_size: "Shift-x"
   label_picker: ""
   toggle_show_selected_label: ""
-  interpolate_borders: ""
   set_corner_view: ""
