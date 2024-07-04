@@ -55,6 +55,7 @@ customizable_hotkeys:
   erode_labels: "i"
   dilate_labels: "u"
   connected_components: "'"
+  reset_plane_to_default: "m"
   save_labels: "h"
   decrease_brush_size: "Shift-z"
   increase_brush_size: "Shift-x"

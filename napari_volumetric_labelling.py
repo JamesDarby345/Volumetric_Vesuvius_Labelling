@@ -383,6 +383,25 @@ def shift_prev_erase_plane(direction):
         new_position = current_position + direction * normal_vector
         prev_erase_plane_info_var['position'] = new_position
 
+def reset_plane_to_default(viewer, layer_name=data_name):
+    if layer_name not in viewer.layers:
+        print(f"Layer '{layer_name}' not found in the viewer.")
+        return
+
+    layer = viewer.layers[layer_name]
+    
+    if not hasattr(layer, 'plane'):
+        print(f"Layer '{layer_name}' is not a plane layer.")
+        return
+
+    # Get the data shape
+    data_shape = layer.data.shape
+    center = np.array(data_shape) / 2
+
+    layer.plane.position = center
+    layer.plane.normal = (1, 0, 0)
+    layer.visible = True
+
         
 def shift_plane(layer, direction, padding_mode=False, padding=50):
     global plane_shift_status
@@ -821,6 +840,7 @@ def add_padding_contextual_data(viewer):
         if manual_changes_mask is not None:
             manual_changes_mask = manual_changes_mask[slices]
         shift_plane(viewer.layers[data_name], 0, padding_mode=True, padding=-pad_amount)
+        viewer.camera.center = (viewer.camera.center[0] - pad_amount, viewer.camera.center[1] - pad_amount, viewer.camera.center[2] - pad_amount)
         pad_state = False
     else:
         data = padded_raw_data
@@ -840,6 +860,7 @@ def add_padding_contextual_data(viewer):
         if manual_changes_mask is not None:
             manual_changes_mask = np.pad(manual_changes_mask, pad_width=pad_width, mode='constant', constant_values=0)
         shift_plane(viewer.layers[data_name], 0, padding_mode=True, padding=pad_amount)
+        viewer.camera.center = (viewer.camera.center[0] + pad_amount, viewer.camera.center[1] + pad_amount, viewer.camera.center[2] + pad_amount)
         pad_state = True
 
 #keybind i to erode the labels layer
