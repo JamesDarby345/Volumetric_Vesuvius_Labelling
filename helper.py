@@ -18,6 +18,19 @@ from vispy.util import keys
 from collections import deque
 import numba
 import zarr 
+import ast
+
+def ensure_list(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            # Try to parse the string as a list
+            return ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            # If it's not a valid list representation, wrap it in a list
+            return [value]
+    return [value] if value is not None else []
 
 #monkey-patch the camera controls
 def patched_viewbox_mouse_event(self, event):

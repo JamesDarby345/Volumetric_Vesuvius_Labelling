@@ -17,6 +17,8 @@ import sys
 from collections import namedtuple
 from vispy.scene.cameras.perspective import Base3DRotationCamera
 from vispy.util import keys
+from datetime import datetime
+from collections import defaultdict
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
 
@@ -122,6 +124,14 @@ if os.path.exists(label_path):
         label_data = label_data * np.logical_not(bright_spot_mask(data))
     # label_data = np.pad(label_data, pad_width=1, mode='constant', constant_values=0)
     labels_layer.data = label_data
+print(label_header)
+label_header = defaultdict(list, label_header)
+for key in ['saved_timestamps', 'open_timestamps']:
+    label_header[key] = ensure_list(label_header[key])
+# Now you can simply append the new timestamp
+label_header['open_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+if 'author' not in label_header and author is not None and author != '':
+    label_header['author'] = author
 
 padded_labels = np.pad(label_data, pad_width=pad_amount, mode='constant', constant_values=0)
 
@@ -908,8 +918,9 @@ def save_labels(viewer):
     print(labels_layer.data.shape, labels_layer.data.dtype)
     if label_3d_name in viewer.layers:
         update_label_from_3d(viewer)
-    
-    nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), labels_layer.data)
+    label_header['saved_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    save_header = dict(label_header)
+    nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), labels_layer.data, header=save_header)
     nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_raw.nrrd"), viewer.layers[data_name].data)
     msg = f"Layers saved to {output_path}"
     show_popup(msg)
