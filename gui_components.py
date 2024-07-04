@@ -238,6 +238,7 @@ class VesuviusGUI:
         <b>Custom Napari Keybinds:</b><br>
         - {get_key_string('toggle_labels_visibility')} to toggle label visibility<br>
         - {get_key_string('toggle_data_visibility')} to toggle data visibility<br>
+        - {get_key_string('reset_plane_to_default')} to reset data plane to default position<br>
         - {get_key_string('cut_label_at_oblique_plane')} to cut label at 3D plane location<br>
         - {get_key_string('switch_to_data_layer')} to switch active layer to data layer<br>
         - {get_key_string('full_label_view')} to toggle full 3D label view<br>
