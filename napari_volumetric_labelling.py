@@ -17,8 +17,7 @@ import sys
 from collections import namedtuple
 from vispy.scene.cameras.perspective import Base3DRotationCamera
 from vispy.util import keys
-
-from napari_threedee.visualization._qt.qt_lighting_control import QtLightingControlWidget
+from vispy.app import use_app
 
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
@@ -113,6 +112,20 @@ erase_slice_width = 30
 # Add the 3D data to the viewer
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
 labels_layer = viewer.add_labels(label_data, name=label_name)
+
+# Apply the custom shader
+test_layer = viewer.add_labels(
+    label_data,
+    name='Smooth Labels'
+)
+
+test_layer._visual = SmoothLabelVolumeVisual(test_layer.data)
+test_layer.colormap = get_direct_label_colormap()
+test_layer.refresh()
+
+smooth_labels_layer = SmoothLabelsLayer(data, name='Smooth Labels 2')
+tl2 = viewer.add_layer(smooth_labels_layer)
+tl2.colormap = get_direct_label_colormap()
 
 # viewer.window.add_plugin_dock_widget(
 #     plugin_name="napari-threedee", widget_name="render plane manipulator"

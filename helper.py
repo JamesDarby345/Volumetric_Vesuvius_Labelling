@@ -18,6 +18,253 @@ from vispy.util import keys
 from collections import deque
 import numba
 import zarr 
+from vispy.visuals import VolumeVisual
+from vispy.gloo import Texture3D, Program, VertexBuffer
+from napari.layers import Labels
+
+class SmoothLabelsLayer(Labels):
+    def __init__(self, data, sigma=1.0, **kwargs):
+        self.original_data = data
+        self.sigma = sigma
+        smoothed_data = self.smooth_data(data)
+        super().__init__(smoothed_data, **kwargs)
+
+    def smooth_data(self, data):
+        # Convert labels to one-hot encoding
+        unique_labels = np.unique(data)
+        one_hot = np.zeros(data.shape + (len(unique_labels),), dtype=np.float32)
+        for i, label in enumerate(unique_labels):
+            one_hot[..., i] = (data == label)
+
+        # Apply Gaussian filter to each channel
+        smoothed_one_hot = np.zeros_like(one_hot)
+        for i in range(len(unique_labels)):
+            smoothed_one_hot[..., i] = gaussian_filter(one_hot[..., i], sigma=self.sigma)
+
+        # Convert back to label format
+        smoothed_data = np.argmax(smoothed_one_hot, axis=-1)
+        return smoothed_data
+
+    def refresh(self):
+        self.data = self.smooth_data(self.original_data)
+        super().refresh()
+
+class SmoothLabelVolumeVisual(VolumeVisual):
+    def __init__(self, data, *args, **kwargs):
+        self._custom_shader_program = None
+        self._tex_coords = VertexBuffer()
+        self._vertices = VertexBuffer()
+        super().__init__(data, *args, **kwargs)
+
+    def set_data(self, vol, clim=None):
+        # Ensure data is 3D
+        if vol.ndim == 2:
+            vol = vol[:, :, np.newaxis]
+        elif vol.ndim != 3:
+            raise ValueError("Volume visual needs a 3D array.")
+
+        # Downcast to float32 if necessary
+        if vol.dtype == np.float64:
+            vol = vol.astype(np.float32)
+
+        # Create the texture
+        self._texture = Texture3D(vol, interpolation='nearest', wrapping='clamp_to_edge')
+        
+        # Build the custom shader program
+        self._custom_shader_program = self._build_custom_shader()
+
+        # Update the vertex buffer
+        shape = vol.shape[::-1]
+        vertex_data = self._create_vertex_data(shape)
+        self._vertices.set_data(vertex_data)
+
+        # Update the texture coordinates
+        tex_coord_data = self._create_texture_coordinate_data(shape)
+        self._tex_coords.set_data(tex_coord_data)
+
+        self._need_vertex_update = True
+        self._vol_shape = shape
+
+        # Handle clim
+        if clim is None:
+            clim = 'auto'
+        if isinstance(clim, str) and clim == 'auto':
+            clim = vol.min(), vol.max()
+        self._clim = clim
+        
+        self.update()
+
+    def _create_vertex_data(self, shape):
+        x, y, z = shape
+        return np.array([
+            [0, 0, 0], [x, 0, 0], [x, y, 0], [0, y, 0],
+            [0, 0, z], [x, 0, z], [x, y, z], [0, y, z]
+        ], dtype=np.float32)
+
+    def _create_texture_coordinate_data(self, shape):
+        return np.array([
+            [0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+            [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]
+        ], dtype=np.float32)
+
+    def _build_custom_shader(self):
+        vertex_shader = """
+        attribute vec3 a_position;
+        attribute vec3 a_texcoord;
+        varying vec3 v_texcoord;
+        void main() {
+            v_texcoord = a_texcoord;
+            gl_Position = $transform(vec4(a_position, 1.0));
+        }
+        """
+        
+        fragment_shader = """
+        uniform $sampler_type u_volumetex;
+        uniform vec3 u_shape;
+        uniform float u_threshold;
+        uniform float u_relative_step_size;
+        varying vec3 v_texcoord;
+        void main() {
+            vec3 loc = v_texcoord;
+            float val = texture(u_volumetex, loc).r;
+            
+            // Simple smoothing: average with neighboring voxels
+            float sum = 0.0;
+            float count = 0.0;
+            for(float x = -1.0; x <= 1.0; x += 1.0) {
+                for(float y = -1.0; y <= 1.0; y += 1.0) {
+                    for(float z = -1.0; z <= 1.0; z += 1.0) {
+                        vec3 offset = vec3(x, y, z) / u_shape;
+                        sum += texture(u_volumetex, loc + offset).r;
+                        count += 1.0;
+                    }
+                }
+            }
+            float smoothed_val = sum / count;
+            
+            gl_FragColor = vec4(smoothed_val, smoothed_val, smoothed_val, 1.0);
+        }
+        """
+        
+        return Program(vertex_shader, fragment_shader)
+
+    def _compute_draw_mode(self):
+        draw_mode = super()._compute_draw_mode()
+        if self._custom_shader_program is not None:
+            draw_mode['method'] = 'custom'
+            draw_mode['program'] = self._custom_shader_program
+        return draw_mode
+
+
+def get_smooth_iso_categorical_shader():
+    SMOOTH_ISO_CATEGORICAL_SNIPPETS = {
+        'before_loop': """
+        vec4 color3 = vec4(0.0); // final color
+        vec3 dstep = 1.5 / u_shape; // step to sample derivative, set to match iso shader
+        gl_FragColor = vec4(0.0);
+        bool discard_fragment = true;
+        vec4 label_id = vec4(0.0);
+        vec4 prev_label_id = vec4(0.0);
+        float smoothness = 0.5; // Adjust this value to control smoothness (0.0 - 1.0)
+        """,
+
+        'in_loop': """
+        // check if value is different from the background value
+        if (floatNotEqual(val, categorical_bg_value)) {
+            // Take the last interval in smaller steps
+            vec3 iloc = loc - step;
+            vec4 prev_color = vec4(0.0);
+            for (int i=0; i<10; i++) {
+                prev_label_id = label_id;
+                label_id = $get_data(iloc);
+                vec4 current_color = sample_label_color(label_id.r);
+                
+                if (floatNotEqual(current_color.a, 0)) {
+                    // Interpolate between previous and current color
+                    float t = float(i) / 10.0;
+                    vec4 interpolated_color = mix(prev_color, current_color, smoothstep(0.0, 1.0, t));
+                    
+                    // Smooth transition between labels
+                    float label_transition = smoothstep(0.0, smoothness, t);
+                    color = mix(sample_label_color(prev_label_id.r), interpolated_color, label_transition);
+                    
+                    // Apply edge detection for enhanced boundaries
+                    vec3 grad = estimate_gradient(iloc, dstep);
+                    float edge = 1.0 - smoothstep(0.0, 0.05, length(grad));
+                    color.rgb = mix(color.rgb, vec3(1.0), edge * 0.3);  // Highlight edges
+                    
+                    // calculate the shaded color (apply lighting effects)
+                    color = calculateShadedCategoricalColor(color, iloc, dstep);
+                    gl_FragColor = color;
+                    
+                    // set the variables for the depth buffer
+                    frag_depth_point = iloc * u_shape;
+                    discard_fragment = false;
+                    iter = nsteps;
+                    break;
+                }
+                prev_color = current_color;
+                iloc += step * 0.1;
+            }
+        }
+        """,
+
+        'after_loop': """
+        if (discard_fragment) discard;
+        """
+    }
+
+    # Additional functions to add to your shader
+    SMOOTH_ISO_CATEGORICAL_SNIPPETS['functions'] = """
+    vec3 estimate_gradient(vec3 pos, vec3 step) {
+        vec4 gx1 = $get_data(pos + vec3(step.x, 0.0, 0.0));
+        vec4 gx2 = $get_data(pos - vec3(step.x, 0.0, 0.0));
+        vec4 gy1 = $get_data(pos + vec3(0.0, step.y, 0.0));
+        vec4 gy2 = $get_data(pos - vec3(0.0, step.y, 0.0));
+        vec4 gz1 = $get_data(pos + vec3(0.0, 0.0, step.z));
+        vec4 gz2 = $get_data(pos - vec3(0.0, 0.0, step.z));
+        
+        return vec3(gx1.r - gx2.r, gy1.r - gy2.r, gz1.r - gz2.r);
+    }
+    """
+    TRANSLUCENT_CATEGORICAL_SNIPPETS = {
+        'before_loop': """
+            vec4 color3 = vec4(0.0);  // final color
+            gl_FragColor = vec4(0.0);
+            bool discard_fragment = true;
+            vec4 label_id = vec4(0.0);
+            """,
+        'in_loop': """
+            // check if value is different from the background value
+            if ( floatNotEqual(val, categorical_bg_value) ) {
+                // Take the last interval in smaller steps
+                vec3 iloc = loc - step;
+                for (int i=0; i<10; i++) {
+                    label_id = $get_data(iloc);
+                    color = sample_label_color(label_id.r);
+                    if (floatNotEqual(color.a, 0) ) {
+                        // fully transparent color is considered as background, see napari/napari#5227
+                        // when the value mapped to non-transparent color is reached
+                        // calculate the color (apply lighting effects)
+                        gl_FragColor = color;
+
+                        // set the variables for the depth buffer
+                        frag_depth_point = iloc * u_shape;
+                        discard_fragment = false;
+
+                        iter = nsteps;
+                        break;
+                    }
+                    iloc += step * 0.1;
+                }
+            }
+            """,
+        'after_loop': """
+            if (discard_fragment)
+                discard;
+            """,
+    }
+    return SMOOTH_ISO_CATEGORICAL_SNIPPETS
 
 #monkey-patch the camera controls
 def patched_viewbox_mouse_event(self, event):
