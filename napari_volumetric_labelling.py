@@ -1001,9 +1001,7 @@ def refresh_plane_manipulator_widget(viewer):
     main_window.addDockWidget(Qt.RightDockWidgetArea, new_dock_widget)
     print("New plane manipulator widget added")
 
-    # Ensure the widget is visible
-    new_dock_widget.setVisible(True)
-    new_dock_widget.raise_()  # Bring the widget to the front
+    
 
     return new_widget
 
