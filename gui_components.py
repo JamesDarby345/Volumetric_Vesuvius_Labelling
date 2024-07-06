@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QPushButton, QLabel,
                              QVBoxLayout, QScrollArea, QSizePolicy, QSpinBox, QColorDialog)
 from PyQt5.QtCore import Qt
 from helper import *
+from napari_threedee.manipulators._qt import QtRenderPlaneManipulatorWidget
 
 MIN_BUTTON_WIDTH = 150
 
@@ -63,14 +64,51 @@ class VesuviusGUI:
             return ' or '.join(keys)
         return str(keys)
 
+    def create_threedee_widget(self):
+        container = QWidget()
+        layout = QVBoxLayout()
+        container.setLayout(layout)
+        
+        # Add label
+        label = QLabel("Plane Manipulator Toggle:")
+        layout.addWidget(label)
+        
+        # Add the threedee widget
+        threedee_widget = QtRenderPlaneManipulatorWidget(self.viewer)
+        layout.addWidget(threedee_widget)
+        
+        return container
+
     def create_button_container(self):
         container = QWidget()
         layout = QVBoxLayout()
         container.setLayout(layout)
+        
+        # Set smaller margins for the layout
+        layout.setContentsMargins(5, 5, 5, 5)
+        
+        # Set smaller spacing between widgets
+        layout.setSpacing(8)
+        
         buttons = [self.dilate_button, self.erode_button, self.full_view_button, self.plane_cut_button, 
-                self.cut_plane_button, self.padding_button, self.components_button, self.save_button]
+                self.cut_plane_button, self.padding_button, self.components_button, self.save_button, self.threedee_widget]
+        
         for button in buttons:
             layout.addWidget(button)
+            
+            # If it's a CustomButtonWidget, adjust its internal layout
+            if isinstance(button, CustomButtonWidget):
+                button_layout = button.layout()
+                button_layout.setSpacing(2)
+                button_layout.setContentsMargins(2, 2, 2, 2)
+                
+                # Adjust the size policy of the button and label
+                button.findChild(QPushButton).setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+                button.findChild(QLabel).setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        
+        # Add a stretch at the end to push all widgets to the top
+        layout.addStretch(1)
+        
         return container
 
     def create_erase_width_input(self):
@@ -107,7 +145,7 @@ class VesuviusGUI:
         self.cut_plane_button = CustomButtonWidget("Cut Label at Plane", self.get_key_string('cut_label_at_oblique_plane'), self.cut_label_at_plane_gui)
         self.components_button = CustomButtonWidget("Connected Components", self.get_key_string('connected_components'), self.run_connected_components)
         self.save_button = CustomButtonWidget("Save Labels", self.get_key_string('save_labels'), self.save_labels_button)
-
+        self.threedee_widget = self.create_threedee_widget()
         color_picker_widget = ColorPickerWidget(self.viewer)
 
         button_container = self.create_button_container()

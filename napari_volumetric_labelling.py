@@ -114,10 +114,6 @@ erase_slice_width = 30
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
 labels_layer = viewer.add_labels(label_data, name=label_name)
 
-# viewer.window.add_plugin_dock_widget(
-#     plugin_name="napari-threedee", widget_name="render plane manipulator"
-# )
-
 #load saved labels if they exist
 file_path = os.path.join('output',f'volumetric_labels_{scroll_name}')
 label_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}",f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
@@ -135,6 +131,8 @@ for key in ['saved_timestamps', 'open_timestamps']:
 label_header['open_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 if 'author' not in label_header and author is not None and author != '':
     label_header['author'] = author
+
+
 
 padded_labels = np.pad(label_data, pad_width=pad_amount, mode='constant', constant_values=0)
 

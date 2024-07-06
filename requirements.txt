@@ -8,3 +8,4 @@ scipy
 matplotlib
 jupyter
 ipykernel
+napari-threedee
