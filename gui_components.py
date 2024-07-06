@@ -2,7 +2,6 @@ from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QPushButton, QLabel,
                              QVBoxLayout, QScrollArea, QSizePolicy, QSpinBox, QColorDialog)
 from PyQt5.QtCore import Qt
 from helper import *
-from napari_threedee.manipulators._qt import QtRenderPlaneManipulatorWidget
 
 MIN_BUTTON_WIDTH = 150
 
@@ -64,21 +63,6 @@ class VesuviusGUI:
             return ' or '.join(keys)
         return str(keys)
 
-    def create_threedee_widget(self):
-        container = QWidget()
-        layout = QVBoxLayout()
-        container.setLayout(layout)
-        
-        # Add label
-        label = QLabel("Plane Manipulator Toggle:")
-        layout.addWidget(label)
-        
-        # Add the threedee widget
-        threedee_widget = QtRenderPlaneManipulatorWidget(self.viewer)
-        layout.addWidget(threedee_widget)
-        
-        return container
-
     def create_button_container(self):
         container = QWidget()
         layout = QVBoxLayout()
@@ -91,7 +75,7 @@ class VesuviusGUI:
         layout.setSpacing(8)
         
         buttons = [self.dilate_button, self.erode_button, self.full_view_button, self.plane_cut_button, 
-                self.cut_plane_button, self.padding_button, self.components_button, self.save_button, self.threedee_widget]
+                self.cut_plane_button, self.padding_button, self.components_button, self.save_button]
         
         for button in buttons:
             layout.addWidget(button)
@@ -145,7 +129,6 @@ class VesuviusGUI:
         self.cut_plane_button = CustomButtonWidget("Cut Label at Plane", self.get_key_string('cut_label_at_oblique_plane'), self.cut_label_at_plane_gui)
         self.components_button = CustomButtonWidget("Connected Components", self.get_key_string('connected_components'), self.run_connected_components)
         self.save_button = CustomButtonWidget("Save Labels", self.get_key_string('save_labels'), self.save_labels_button)
-        self.threedee_widget = self.create_threedee_widget()
         color_picker_widget = ColorPickerWidget(self.viewer)
 
         button_container = self.create_button_container()

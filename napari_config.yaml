@@ -17,7 +17,7 @@ cube_info:
 customizable_hotkeys:
   toggle_labels_visibility: ["s","/"]
   toggle_data_visibility: ["w","."]
-  erase_mode: ["Shift-w"]
+  erase_mode_toggle: ["Shift-w"]
   move_mode: ["Shift-s"]
   #------------------------
   #arrow keys have 2d default behaviour, these extend behaviour to 3d plane shifting

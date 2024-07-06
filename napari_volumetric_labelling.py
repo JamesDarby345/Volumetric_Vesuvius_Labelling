@@ -19,6 +19,9 @@ from vispy.scene.cameras.perspective import Base3DRotationCamera
 from vispy.util import keys
 from datetime import datetime
 from collections import defaultdict
+from napari_threedee.manipulators._qt import QtRenderPlaneManipulatorWidget
+from PyQt5.QtWidgets import QDockWidget
+from PyQt5.QtCore import Qt
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
 
@@ -55,7 +58,6 @@ raw_data = None
 data = None
 
 nrrd_cube_path = os.path.join(current_directory, 'data/nrrd_cubes') #Change to the path of the folder containing the nrrd cubes
-# Construct the file path using os.path.join
 mask_file_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}', f'{z}_{y}_{x}_mask.nrrd')
 original_label_data, label_header = nrrd.read(mask_file_path)
 label_data = original_label_data
@@ -102,6 +104,7 @@ ff_name = 'Flood Fill'
 cc_preview_name = 'Connected Components Preview'
 label_3d_name = '3D Label Edit Layer'
 pad_state = False
+global erase_mode
 erase_mode = False
 cut_side = True
 plane_shift_status = False
@@ -121,18 +124,15 @@ if os.path.exists(label_path):
     label_data, label_header = nrrd.read(label_path)
     if bright_spot_masking:
         label_data = label_data * np.logical_not(bright_spot_mask(data))
-    # label_data = np.pad(label_data, pad_width=1, mode='constant', constant_values=0)
     labels_layer.data = label_data
 print(label_header)
 label_header = defaultdict(list, label_header)
 for key in ['saved_timestamps', 'open_timestamps']:
     label_header[key] = ensure_list(label_header[key])
-# Now you can simply append the new timestamp
+
 label_header['open_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 if 'author' not in label_header and author is not None and author != '':
     label_header['author'] = author
-
-
 
 padded_labels = np.pad(label_data, pad_width=pad_amount, mode='constant', constant_values=0)
 
@@ -148,7 +148,6 @@ def pan_with_middle_mouse(viewer, event):
         while event.type == 'mouse_move':
             yield
         viewer.layers.selection.active.mode = original_mode
-
 
 def apply_global_brush_size(viewer, source_layer=None):
     global brush_size
@@ -168,14 +167,10 @@ def setup_brush_size_listener(viewer, layer_name):
     labels_layer = viewer.layers[layer_name]
     labels_layer.events.brush_size.connect(update_global_brush_size)
 
-#keybind l to switch to the data layer as the active layer
-#@viewer.bind_key('l')
 def switch_to_data_layer(viewer):
     viewer.layers[data_name].visible = True
     viewer.layers.selection.active = viewer.layers[data_name]
 
-#keybind r to toggle the labels layer visibility
-#@viewer.bind_key('r')
 def toggle_labels_visibility(viewer):
     msg = 'toggle labels visibility'
     viewer.status = msg
@@ -185,22 +180,12 @@ def toggle_labels_visibility(viewer):
     else:
         labels_layer.visible = not labels_layer.visible
 
-#keybind / alt to toggle the labels layer visibility
-# viewer.bind_key('/', toggle_labels_visibility)
-
-#keybind . to toggle the data visibility
-#@viewer.bind_key('.')
 def toggle_data_visibility(viewer):
     msg = 'toggle data visibility'
     viewer.status = msg
     print(msg)
     image_layer.visible = not image_layer.visible
 
-#keybind t alt to toggle the data layer visibility
-# viewer.bind_key('t', toggle_data_visibility)
-
-#keybind q to decrease the brush size of the labels layer
-#@viewer.bind_key('q')
 def decrease_brush_size(viewer):
     global brush_size
     msg = 'decrease brush size'
@@ -209,8 +194,6 @@ def decrease_brush_size(viewer):
     brush_size -= 1
     apply_global_brush_size(viewer)
 
-#keybind e to increase the brush size of the labels layer
-#@viewer.bind_key('e')
 def increase_brush_size(viewer):
     global brush_size
     msg = 'increase brush size'
@@ -219,8 +202,6 @@ def increase_brush_size(viewer):
     brush_size += 1
     apply_global_brush_size(viewer)
 
-#keybind s to toggle the show selected label only mode
-#@viewer.bind_key('s')
 def toggle_show_selected_label(viewer):
     msg = 'toggle show selected label'
     viewer.status = msg
@@ -229,7 +210,6 @@ def toggle_show_selected_label(viewer):
     if label_3d_name in viewer.layers:
         viewer.layers[label_3d_name].show_selected_label = not viewer.layers[label_3d_name].show_selected_label
 
-# Function to capture cursor information when 'w' is pressed
 def capture_cursor_info(event):
     # Get cursor position in world coordinates
     position = viewer.cursor.position
@@ -244,17 +224,12 @@ def capture_cursor_info(event):
     print(f"Cursor Position: {indices}, Label Value: {label_value}")
     labels_layer.selected_label = label_value
 
-# keybind w to capture cursor info and select the label under the cursor
-# 4 and the color picker also works for this
-#@viewer.bind_key('w')
 def label_picker(event):
     capture_cursor_info(event)
 
 # Add an empty labels layer for the flood fill result
 flood_fill_layer = viewer.add_labels(np.zeros_like(data), name=ff_name)
 
-#keybind f to run the flood fill function with a distance of 20
-#@viewer.bind_key('f')
 def flood_fill(viewer, distance=20):
     msg = 'flood fill'
     viewer.status = msg
@@ -275,8 +250,6 @@ def flood_fill(viewer, distance=20):
     # Update the flood fill layer with the result
     flood_fill_layer.data = flood_fill_result
 
-#keybind g to run the flood fill function with a distance of 100
-#@viewer.bind_key('g')
 def large_flood_fill(viewer):
     flood_fill(viewer, 100)
 
@@ -402,8 +375,7 @@ def reset_plane_to_default(viewer, layer_name=data_name):
     layer.plane.position = center
     layer.plane.normal = (1, 0, 0)
     layer.visible = True
-
-        
+ 
 def shift_plane(layer, direction, padding_mode=False, padding=50):
     global plane_shift_status
     plane_shift_status = True
@@ -438,8 +410,6 @@ def shift_plane(layer, direction, padding_mode=False, padding=50):
     else:
         print("Cannot shift: not in plane mode or 2D view")
 
-#keybind b to switch to full label 3d view
-#@viewer.bind_key('b', overwrite=True)
 def full_label_view(viewer):
     global prev_camera_pos
     if label_3d_name in viewer.layers:
@@ -467,10 +437,6 @@ def full_label_view(viewer):
         viewer.layers.selection.active = viewer.layers[label_name]
         viewer.layers[label_name].contour = 1
             
-
-
-#keybind \ to setup the 3d viewing mode conviniently with custom vesuvius layers
-#@viewer.bind_key('\\')
 def switch_to_plane_view(viewer):
     global prev_camera_pos
     if label_3d_name in viewer.layers:
@@ -570,7 +536,7 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     plane_shift_status = False
     data_plane = viewer.layers[data_name]
     if data_plane.depiction != 'plane':
-        print("Please switch to plane mode by pressing '\\' key.")
+        print("Please switch to plane mode.")
         return
     if viewer.layers.selection.active is not None:
         active_mode = viewer.layers.selection.active.mode
@@ -618,26 +584,25 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     # Store the current state of the label_3d_name layer for future comparison
     previous_label_3d_data = new_label_data.copy()
 
+    refresh_plane_manipulator_widget(viewer)
+
+
 def plane_3d_erase_mode_shift_left(viewer):
     global erase_mode, prev_erase_plane_info_var, erase_slice_width
     overlap = erase_slice_width//5
-    if erase_mode:
-        shift_prev_erase_plane(-erase_slice_width+overlap)
-        shift_plane(viewer.layers[data_name], -erase_slice_width+overlap)
-        if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-            cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
+    shift_prev_erase_plane(-erase_slice_width+overlap)
+    shift_plane(viewer.layers[data_name], -erase_slice_width+overlap)
+    if erase_mode and viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
 def plane_3d_erase_mode_shift_right(viewer):
     global erase_mode, prev_erase_plane_info_var, erase_slice_width
     overlap = erase_slice_width//5
-    if erase_mode:
-        shift_prev_erase_plane(erase_slice_width-overlap)
-        shift_plane(viewer.layers[data_name], erase_slice_width-overlap)
-        if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-            cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
+    shift_prev_erase_plane(erase_slice_width-overlap)
+    shift_plane(viewer.layers[data_name], erase_slice_width-overlap)
+    if erase_mode and viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+        cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
 
-#keybind Left arrow  to shift the plane along the normal vector in 3d viewing mode
-#@viewer.bind_key('Left', overwrite=True)
 def shift_data_left_and_recut_3d_label(viewer):
     global erase_mode, cut_side
     shift_plane(viewer.layers[data_name], -1)
@@ -723,7 +688,7 @@ viewer.window._qt_viewer.canvas.events.key_release.connect(stop_timers)
 
 #keybind ' to switch to eraser on the 3d label layer
 #@viewer.bind_key('\'')
-def erase_mode(viewer):
+def erase_mode_toggle(viewer):
     global eraser_size
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         viewer.layers[label_3d_name].mode = 'erase'
@@ -893,8 +858,6 @@ def erode_labels(viewer):
     viewer.status = msg
     print(msg)
 
-#keybind u to dilate the labels layer
-#@viewer.bind_key('u')
 def dilate_labels(viewer):
     global pad_state
     msg = 'dilating labels'
@@ -922,8 +885,6 @@ def dilate_labels(viewer):
     viewer.status = msg
     print(msg)
 
-#Keybind h to save the labels and raw layers
-#@viewer.bind_key('h')
 def save_labels(viewer):
     msg = 'save labels'
     viewer.status = msg
@@ -1011,6 +972,40 @@ def update_global_erase_slice_width(value):
 # Create the GUI
 gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotkey_config)
 gui.setup_napari_defaults()
+
+widget = QtRenderPlaneManipulatorWidget(viewer)
+dock_widget = QDockWidget("Plane Manipulator")
+dock_widget.setObjectName("plane_manipulator_dock")  # Set a unique object name
+dock_widget.setWidget(widget)
+viewer.window.add_dock_widget(dock_widget, area="right")
+
+def refresh_plane_manipulator_widget(viewer):
+    main_window = viewer.window._qt_window
+    
+    # Find and remove the existing widget
+    existing_widget = None
+    for dock_widget in main_window.findChildren(QDockWidget):
+        if isinstance(dock_widget.widget(), QtRenderPlaneManipulatorWidget):
+            existing_widget = dock_widget
+            break
+    
+    if existing_widget:
+        main_window.removeDockWidget(existing_widget)
+        existing_widget.setParent(None)
+        existing_widget.deleteLater()
+        print("Existing plane manipulator widget removed")
+    else:
+        print("No existing plane manipulator widget found")
+
+    # Create and add a new widget
+    new_widget = QtRenderPlaneManipulatorWidget(viewer)
+    new_dock_widget = QDockWidget("Plane Manipulator")
+    new_dock_widget.setObjectName("plane_manipulator_dock")  # Set a unique object name
+    new_dock_widget.setWidget(new_widget)
+    main_window.addDockWidget(Qt.RightDockWidgetArea, new_dock_widget)
+    print("New plane manipulator widget added")
+
+    return new_widget
 
 bind_hotkeys(viewer, hotkey_config)
 set_camera_view(viewer)
