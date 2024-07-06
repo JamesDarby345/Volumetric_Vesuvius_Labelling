@@ -983,11 +983,7 @@ def refresh_plane_manipulator_widget(viewer):
     main_window = viewer.window._qt_window
     
     # Find and remove the existing widget
-    existing_widget = None
-    for dock_widget in main_window.findChildren(QDockWidget):
-        if isinstance(dock_widget.widget(), QtRenderPlaneManipulatorWidget):
-            existing_widget = dock_widget
-            break
+    existing_widget = main_window.findChild(QDockWidget, "plane_manipulator_dock")
     
     if existing_widget:
         main_window.removeDockWidget(existing_widget)
@@ -1000,10 +996,14 @@ def refresh_plane_manipulator_widget(viewer):
     # Create and add a new widget
     new_widget = QtRenderPlaneManipulatorWidget(viewer)
     new_dock_widget = QDockWidget("Plane Manipulator")
-    new_dock_widget.setObjectName("plane_manipulator_dock")  # Set a unique object name
+    new_dock_widget.setObjectName("plane_manipulator_dock")  # Set the same unique object name
     new_dock_widget.setWidget(new_widget)
     main_window.addDockWidget(Qt.RightDockWidgetArea, new_dock_widget)
     print("New plane manipulator widget added")
+
+    # Ensure the widget is visible
+    new_dock_widget.setVisible(True)
+    new_dock_widget.raise_()  # Bring the widget to the front
 
     return new_widget
 
