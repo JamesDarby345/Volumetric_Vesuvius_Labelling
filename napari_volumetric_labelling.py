@@ -3,6 +3,7 @@ import napari
 import os
 import numpy as np
 import zarr
+from dask import array as da
 from helper import *
 from gui_components import VesuviusGUI
 from napari.layers import Image
@@ -116,6 +117,17 @@ erase_slice_width = 30
 # Add the 3D data to the viewer
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
 labels_layer = viewer.add_labels(label_data, name=label_name)
+
+# zarr_path = "/Volumes/16TB_slow_RAID_0/3d_ink_zarrs/3d_predictions_scroll4.zarr"
+# # zarr_data = zarr.open(zarr_path, mode='r')
+# dask_data = da.from_zarr(zarr_path)
+# viewer.add_image(
+#     dask_data,
+#     contrast_limits=[0, 255],
+#     scale=[1, 1, 1],  # Adjust if your voxels aren't isotropic
+#     colormap='viridis',
+#     name='Zarr Data'
+# )
 
 #load saved labels if they exist
 file_path = os.path.join('output',f'volumetric_labels_{scroll_name}')
@@ -584,7 +596,7 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     # Store the current state of the label_3d_name layer for future comparison
     previous_label_3d_data = new_label_data.copy()
 
-    refresh_plane_manipulator_widget(viewer)
+    # refresh_plane_manipulator_widget(viewer)
 
 
 def plane_3d_erase_mode_shift_left(viewer):
@@ -973,11 +985,11 @@ def update_global_erase_slice_width(value):
 gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotkey_config)
 gui.setup_napari_defaults()
 
-widget = QtRenderPlaneManipulatorWidget(viewer)
-dock_widget = QDockWidget("Plane Manipulator")
-dock_widget.setObjectName("plane_manipulator_dock")  # Set a unique object name
-dock_widget.setWidget(widget)
-viewer.window.add_dock_widget(dock_widget, area="right")
+# widget = QtRenderPlaneManipulatorWidget(viewer)
+# dock_widget = QDockWidget("Plane Manipulator")
+# dock_widget.setObjectName("plane_manipulator_dock")  # Set a unique object name
+# dock_widget.setWidget(widget)
+# viewer.window.add_dock_widget(dock_widget, area="right")
 
 def refresh_plane_manipulator_widget(viewer):
     main_window = viewer.window._qt_window
