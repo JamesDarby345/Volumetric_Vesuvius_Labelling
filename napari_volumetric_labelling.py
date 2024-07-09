@@ -38,6 +38,7 @@ cube_info, hotkey_config = read_config(config_path)
 
 # Data location and size parameters
 scroll_name = cube_info.get('scroll_name', "")
+mask_factor = cube_info.get('factor', 1.0)
 zyx = cube_info.get('zyx', None)
 if not zyx:
     z = cube_info.get('z', '02000')
@@ -109,7 +110,7 @@ if os.path.exists(mask_file_path):
     original_label_data, label_header = nrrd.read(mask_file_path)
 else:
     #get label from thresholded raw data
-    original_label_data = threshold_mask(raw_data).astype(np.uint8)
+    original_label_data = threshold_mask(raw_data, factor=mask_factor).astype(np.uint8)
     os.makedirs(mask_folder_path, exist_ok=True)
     nrrd.write(mask_file_path, original_label_data)
     original_label_data, label_header = nrrd.read(mask_file_path)

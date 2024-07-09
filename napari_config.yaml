@@ -7,7 +7,8 @@ cube_info:
   brush_size: 4
   use_zarr: False #True if using zarr for raw data instead of nrrd cubes, will still need nrrd mask cubes
   zarr_path: '/path/to/file.zarr'
-  author: ''
+  author: '' #optional author name to add to metadata
+  factor: 1.0 
 #Napari default keybinds will overwrite the custom keybinds in some modes
 #Thus, it is recommended to not use the default keybinds for custom keybinds
 #Keys with default functions include:
