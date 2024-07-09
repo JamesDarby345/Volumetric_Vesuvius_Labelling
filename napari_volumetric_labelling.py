@@ -44,23 +44,33 @@ x = cube_info.get('x', '02000')
 z_num = int(z)
 y_num = int(y)
 x_num = int(x)
+
+if scroll_name == 's1' and not is_valid_coord([z_num, y_num, x_num]):
+    print(f"Invalid coordinates: {z_num}, {y_num}, {x_num}")
+    z_num = find_nearest_valid_coord(z_num)
+    y_num = find_nearest_valid_coord(y_num)
+    x_num = find_nearest_valid_coord(x_num)
+    print(f"Using nearest valid coordinates: {z_num}, {y_num}, {x_num}")
+    z = str(z_num).zfill(5)
+    y = str(y_num).zfill(5)
+    x = str(x_num).zfill(5)
+
 chunk_size = cube_info.get('chunk_size', 256)
 pad_amount = cube_info.get('pad_amount', 100)
 brush_size = cube_info.get('brush_size', 4)
 author = cube_info.get('author', '-')
+use_zarr = cube_info.get('use_zarr', False)
 
 current_directory = os.getcwd()
 pad_state = False
 padded_raw_data = []
 
-use_zarr = cube_info.get('use_zarr', False)
 raw_data = None 
 data = None
+original_label_data = None
+label_header = None
 
 nrrd_cube_path = os.path.join(current_directory, 'data/nrrd_cubes') #Change to the path of the folder containing the nrrd cubes
-mask_file_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}', f'{z}_{y}_{x}_mask.nrrd')
-original_label_data, label_header = nrrd.read(mask_file_path)
-label_data = original_label_data
 
 #nrrd zyx coord cubes
 if not use_zarr:
@@ -85,6 +95,18 @@ try:
 except Exception as e:
     print(f"An unexpected error occurred with padded_raw_data: {e}")
     padded_raw_data = raw_data
+
+mask_folder_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}')
+mask_file_path = os.path.join(mask_folder_path, f'{z}_{y}_{x}_mask.nrrd')
+if os.path.exists(mask_file_path):
+    original_label_data, label_header = nrrd.read(mask_file_path)
+else:
+    #get label from thresholded raw data
+    original_label_data = threshold_mask(raw_data).astype(np.uint8)
+    os.makedirs(mask_folder_path, exist_ok=True)
+    nrrd.write(mask_file_path, original_label_data)
+    original_label_data, label_header = nrrd.read(mask_file_path)
+label_data = original_label_data
 
 # removes bright spots from the data, brightest 0.5% of the data
 bright_spot_masking = False

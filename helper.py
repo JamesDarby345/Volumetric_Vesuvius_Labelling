@@ -2,7 +2,7 @@ import numpy as np
 from skimage.color import gray2rgb
 from skimage.segmentation import find_boundaries
 from skimage.util import img_as_float
-from skimage.morphology import dilation, square, remove_small_objects
+from skimage.morphology import dilation, square, remove_small_objects, remove_small_holes
 import random
 import scipy.ndimage
 from matplotlib import pyplot as plt
@@ -19,6 +19,47 @@ from collections import deque
 import numba
 import zarr 
 import ast
+
+import numpy as np
+
+def is_valid_coord(num_or_list):
+    if isinstance(num_or_list, (int, float)):
+        difference = abs(num_or_list - 2000)
+        return difference % 256 == 0
+    elif isinstance(num_or_list, (list, np.ndarray)):
+        differences = np.abs(np.array(num_or_list) - 2000)
+        return (differences % 256 == 0).all()
+    else:
+        raise TypeError("Input must be a number, list, or numpy array")
+
+def find_nearest_valid_coord(num):
+    difference = num - 2000
+    quotient = difference // 256
+    remainder = difference % 256
+
+    if remainder == 0:
+        return num
+    elif remainder > 128:
+        return 2000 + 256 * (quotient + 1)
+    else:
+        return 2000 + 256 * quotient
+
+
+def threshold_mask(array_3d, factor=1.0, min_size=200, hole_size=200):
+    # Calculate the mean of the entire 3D array
+    threshold = np.mean(array_3d) / factor
+    
+    # Create initial mask
+    mask = array_3d > threshold
+    
+    # Remove small objects and holes
+    mask = remove_small_objects(mask, min_size=min_size)
+    mask = remove_small_holes(mask, area_threshold=hole_size)
+
+    #remove bright spots, top 0.5% brightest voxels
+    bright_spot_mask_arr = bright_spot_mask(array_3d)
+    mask = mask | bright_spot_mask_arr
+    return mask
 
 def ensure_list(value):
     if isinstance(value, list):
