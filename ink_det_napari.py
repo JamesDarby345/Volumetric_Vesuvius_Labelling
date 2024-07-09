@@ -2,20 +2,7 @@ import zarr
 import napari
 import dask.array as da
 import numpy as np
-
-# def get_ink_det_layers(x,y,z,chunk_size):
-
-def bright_spot_mask(data):
-    # Flatten the multi-dimensional Dask array
-    flat_data = data.flatten()
-    
-    # Compute the 99.5 percentile on the flattened array
-    threshold = np.percentile(flat_data, 99.5)
-    
-    # Create a mask based on the threshold
-    mask = data > threshold
-    
-    return mask
+from helper import bright_spot_mask_dask
 
 viewer = napari.Viewer()
 x1, x2 = 2000, 3000

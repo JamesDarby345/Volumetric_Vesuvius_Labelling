@@ -22,6 +22,18 @@ import ast
 
 import numpy as np
 
+def bright_spot_mask_dask(data):
+    # Flatten the multi-dimensional Dask array
+    flat_data = data.flatten()
+    
+    # Compute the 99.5 percentile on the flattened array
+    threshold = np.percentile(flat_data, 99.5)
+    
+    # Create a mask based on the threshold
+    mask = data > threshold
+    
+    return mask
+
 def is_valid_coord(num_or_list):
     if isinstance(num_or_list, (int, float)):
         difference = abs(num_or_list - 2000)
@@ -38,11 +50,14 @@ def find_nearest_valid_coord(num):
     remainder = difference % 256
 
     if remainder == 0:
-        return num
+        result = num
     elif remainder > 128:
-        return 2000 + 256 * (quotient + 1)
+        result = 2000 + 256 * (quotient + 1)
     else:
-        return 2000 + 256 * quotient
+        result = 2000 + 256 * quotient
+    
+    # Ensure the result is always greater than 0
+    return max(result, 208)
 
 
 def threshold_mask(array_3d, factor=1.0, min_size=200, hole_size=200):

@@ -34,7 +34,7 @@ def read_config(config_path='napari_config.yaml'):
             return config.get('cube_info',{}), config.get('customizable_hotkeys', {})
     return {}
 
-config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
+config_path = 'ink_det_config.yaml' if os.path.exists('ink_det_config.yaml') else 'napari_config.yaml'
 cube_info, hotkey_config = read_config(config_path)
 
 # Data location and size parameters
@@ -69,6 +69,7 @@ pad_amount = cube_info.get('pad_amount', 100)
 brush_size = cube_info.get('brush_size', 4)
 author = cube_info.get('author', '-')
 use_zarr = cube_info.get('use_zarr', False)
+ink_pred_path = cube_info.get('ink_pred_path', None)
 
 current_directory = os.getcwd()
 pad_state = False
@@ -105,17 +106,22 @@ except Exception as e:
     print(f"An unexpected error occurred with padded_raw_data: {e}")
     padded_raw_data = raw_data
 
-mask_folder_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}')
-mask_file_path = os.path.join(mask_folder_path, f'{z}_{y}_{x}_mask.nrrd')
-if os.path.exists(mask_file_path):
-    original_label_data, label_header = nrrd.read(mask_file_path)
+if ink_pred_path is not None and ink_pred_path != '':
+    ink_pred_zarr = zarr.open(ink_pred_path, mode='r')
+    ink_pred_label = ink_pred_zarr[0][z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
+    data = ink_pred_label
 else:
-    #get label from thresholded raw data
-    original_label_data = threshold_mask(raw_data, factor=mask_factor).astype(np.uint8)
-    os.makedirs(mask_folder_path, exist_ok=True)
-    nrrd.write(mask_file_path, original_label_data)
-    original_label_data, label_header = nrrd.read(mask_file_path)
-label_data = original_label_data
+    mask_folder_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}')
+    mask_file_path = os.path.join(mask_folder_path, f'{z}_{y}_{x}_mask.nrrd')
+    if os.path.exists(mask_file_path):
+        original_label_data, label_header = nrrd.read(mask_file_path)
+    else:
+        #get label from thresholded raw data
+        original_label_data = threshold_mask(raw_data, factor=mask_factor).astype(np.uint8)
+        os.makedirs(mask_folder_path, exist_ok=True)
+        nrrd.write(mask_file_path, original_label_data)
+        original_label_data, label_header = nrrd.read(mask_file_path)
+    label_data = original_label_data
 
 # removes bright spots from the data, brightest 0.5% of the data
 bright_spot_masking = False
