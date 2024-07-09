@@ -584,9 +584,6 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     # Store the current state of the label_3d_name layer for future comparison
     previous_label_3d_data = new_label_data.copy()
 
-    refresh_plane_manipulator_widget(viewer)
-
-
 def plane_3d_erase_mode_shift_left(viewer):
     global erase_mode, prev_erase_plane_info_var, erase_slice_width
     overlap = erase_slice_width//5
@@ -972,38 +969,6 @@ def update_global_erase_slice_width(value):
 # Create the GUI
 gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotkey_config)
 gui.setup_napari_defaults()
-
-widget = QtRenderPlaneManipulatorWidget(viewer)
-dock_widget = QDockWidget("Plane Manipulator")
-dock_widget.setObjectName("plane_manipulator_dock")  # Set a unique object name
-dock_widget.setWidget(widget)
-viewer.window.add_dock_widget(dock_widget, area="right")
-
-def refresh_plane_manipulator_widget(viewer):
-    main_window = viewer.window._qt_window
-    
-    # Find and remove the existing widget
-    existing_widget = main_window.findChild(QDockWidget, "plane_manipulator_dock")
-    
-    if existing_widget:
-        main_window.removeDockWidget(existing_widget)
-        existing_widget.setParent(None)
-        existing_widget.deleteLater()
-        print("Existing plane manipulator widget removed")
-    else:
-        print("No existing plane manipulator widget found")
-
-    # Create and add a new widget
-    new_widget = QtRenderPlaneManipulatorWidget(viewer)
-    new_dock_widget = QDockWidget("Plane Manipulator")
-    new_dock_widget.setObjectName("plane_manipulator_dock")  # Set the same unique object name
-    new_dock_widget.setWidget(new_widget)
-    main_window.addDockWidget(Qt.RightDockWidgetArea, new_dock_widget)
-    print("New plane manipulator widget added")
-
-    
-
-    return new_widget
 
 bind_hotkeys(viewer, hotkey_config)
 set_camera_view(viewer)
