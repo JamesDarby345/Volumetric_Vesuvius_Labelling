@@ -1,8 +1,6 @@
 cube_info:
 #cube z,y,x coords to load correct raw data & mask cubes
-  z: '00000'
-  y: '00000'
-  x: '00000'
+  zyx: '00000_00000_00000'
   scroll_name: 's1'
   chunk_size: 256
   pad_amount: 100

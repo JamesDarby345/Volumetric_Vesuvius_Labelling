@@ -38,12 +38,19 @@ cube_info, hotkey_config = read_config(config_path)
 
 # Data location and size parameters
 scroll_name = cube_info.get('scroll_name', "")
-z = cube_info.get('z', '02000')
-y = cube_info.get('y', '02000')
-x = cube_info.get('x', '02000')
-z_num = int(z)
-y_num = int(y)
-x_num = int(x)
+zyx = cube_info.get('zyx', None)
+if not zyx:
+    z = cube_info.get('z', '02000')
+    y = cube_info.get('y', '02000')
+    x = cube_info.get('x', '02000')
+    z_num = int(z)
+    y_num = int(y)
+    x_num = int(x)
+else:
+    z, y, x = map(str, zyx.split('_'))
+    z_num = int(z)
+    y_num = int(y)
+    x_num = int(x)
 
 if scroll_name == 's1' and not is_valid_coord([z_num, y_num, x_num]):
     print(f"Invalid coordinates: {z_num}, {y_num}, {x_num}")
