@@ -34,7 +34,8 @@ def read_config(config_path='napari_config.yaml'):
             return config.get('cube_info',{}), config.get('customizable_hotkeys', {})
     return {}
 
-config_path = 'ink_det_config.yaml' if os.path.exists('ink_det_config.yaml') else 'napari_config.yaml'
+config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
+# config_path = 'ink_det_config.yaml' if os.path.exists('ink_det_config.yaml') else 'napari_config.yaml'
 cube_info, hotkey_config = read_config(config_path)
 
 # Data location and size parameters
@@ -90,7 +91,7 @@ if not use_zarr:
     data = raw_data
 else:
     #use zarr is true
-    zarr_path = cube_info.get('zarr_path', "") #Change this to the path of the zarr file if using zarr
+    zarr_path = cube_info.get('zarr_path', "")
     zarr_multi_res = zarr.open(zarr_path, mode='r')
 
     raw_data = zarr_multi_res[0][z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
@@ -106,10 +107,25 @@ except Exception as e:
     print(f"An unexpected error occurred with padded_raw_data: {e}")
     padded_raw_data = raw_data
 
+#using ink predictions as labels for MVP
 if ink_pred_path is not None and ink_pred_path != '':
-    ink_pred_zarr = zarr.open(ink_pred_path, mode='r')
-    ink_pred_label = ink_pred_zarr[0][z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
-    data = ink_pred_label
+    ink_threshold = cube_info.get('ink_threshold', 150)
+    file_path = os.path.join('output',f'volumetric_labels_{scroll_name}')
+    ink_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}",f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_ink.nrrd")
+
+    if os.path.exists(ink_path):
+        original_label_data, label_header = nrrd.read(ink_path)
+    else:
+        #get label from thresholded raw data
+        ink_pred_zarr = zarr.open(ink_pred_path, mode='r')
+        ink_pred_dask = da.from_zarr(ink_pred_zarr)
+        ink_pred_dask = ink_pred_dask.transpose((2, 0, 1))
+        # print(f"Zarr info: {ink_pred_zarr.info}")
+        print(f"Dask shape: {ink_pred_dask.shape}, ")
+        ink_pred_region = ink_pred_dask[z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
+        thresholded_data = np.array(da.where(ink_pred_region < ink_threshold, 0, 1)).astype(np.uint8)
+        original_label_data = thresholded_data
+    label_data = original_label_data
 else:
     mask_folder_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}')
     mask_file_path = os.path.join(mask_folder_path, f'{z}_{y}_{x}_mask.nrrd')
@@ -122,14 +138,6 @@ else:
         nrrd.write(mask_file_path, original_label_data)
         original_label_data, label_header = nrrd.read(mask_file_path)
     label_data = original_label_data
-
-# removes bright spots from the data, brightest 0.5% of the data
-bright_spot_masking = False
-if bright_spot_masking:
-    bright_spot_mask_arr = bright_spot_mask(data)
-    print(f'bright spot mask shape: {bright_spot_mask_arr.shape}')
-    print(np.max(bright_spot_mask_arr  ))
-    label_data[bright_spot_mask_arr] = 0
 
 # Initialize the Napari viewer
 viewer = napari.Viewer()
@@ -154,35 +162,42 @@ erase_slice_width = 30
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
 labels_layer = viewer.add_labels(label_data, name=label_name)
 
-# zarr_path = "/Volumes/16TB_slow_RAID_0/3d_ink_zarrs/3d_predictions_scroll4.zarr"
-# # zarr_data = zarr.open(zarr_path, mode='r')
-# dask_data = da.from_zarr(zarr_path)
-# viewer.add_image(
-#     dask_data,
-#     contrast_limits=[0, 255],
-#     scale=[1, 1, 1],  # Adjust if your voxels aren't isotropic
-#     colormap='viridis',
-#     name='Zarr Data'
-# )
-
 #load saved labels if they exist
 file_path = os.path.join('output',f'volumetric_labels_{scroll_name}')
 label_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}",f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
 if os.path.exists(label_path):
     label_data, label_header = nrrd.read(label_path)
-    if bright_spot_masking:
-        label_data = label_data * np.logical_not(bright_spot_mask(data))
     labels_layer.data = label_data
-print(label_header)
-label_header = defaultdict(list, label_header)
-for key in ['saved_timestamps', 'open_timestamps']:
-    label_header[key] = ensure_list(label_header[key])
-
-label_header['open_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-if 'author' not in label_header and author is not None and author != '':
-    label_header['author'] = author
+if label_header is not None:
+    print(label_header)
+    label_header = defaultdict(list, label_header)
+    for key in ['saved_timestamps', 'open_timestamps']:
+        label_header[key] = ensure_list(label_header[key])
+    label_header['open_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    if 'author' not in label_header and author is not None and author != '':
+        label_header['author'] = author
 
 padded_labels = np.pad(label_data, pad_width=pad_amount, mode='constant', constant_values=0)
+
+def align_plane_with_selected_label(viewer):
+    labels_layer = viewer.layers[label_name]
+    data_layer = viewer.layers[data_name]
+    
+    # Check if data layer is visible and depicted as a plane
+    if not data_layer.visible or data_layer.depiction != 'plane':
+        print("Data layer is not visible or not depicted as a plane.", data_layer.visible, data_layer.depiction)
+        return
+    
+    # Get the selected label value
+    selected_label = labels_layer.selected_label
+    if selected_label == 0:
+        print("No label selected.")
+        return
+    
+    masked_labels = (labels_layer.data == selected_label).astype(np.uint8)
+    position, normal = find_best_intersecting_plane_napari(masked_labels)
+    data_layer.plane.position = position
+    data_layer.plane.normal = normal
 
 @viewer.mouse_drag_callbacks.append
 def pan_with_middle_mouse(viewer, event):
@@ -314,6 +329,11 @@ prev_camera_pos = None
 previous_label_3d_data = None
 manual_changes_mask = None
 
+def get_current_plane_info(viewer):
+    position = viewer.layers[data_name].plane.position
+    normal = viewer.layers[data_name].plane.normal
+    return {'position': position, 'normal': normal}
+
 def get_current_camera_info(viewer):
     center=viewer.camera.center
     angles=viewer.camera.angles
@@ -406,6 +426,7 @@ def shift_prev_erase_plane(direction):
         prev_erase_plane_info_var['position'] = new_position
 
 def reset_plane_to_default(viewer, layer_name=data_name):
+    print("Resetting plane to default position and normal.")
     if layer_name not in viewer.layers:
         print(f"Layer '{layer_name}' not found in the viewer.")
         return
@@ -423,6 +444,18 @@ def reset_plane_to_default(viewer, layer_name=data_name):
     layer.plane.position = center
     layer.plane.normal = (1, 0, 0)
     layer.visible = True
+
+def reset_plane_view_to_default(viewer):
+    global prev_camera_pos
+    if viewer.dims.ndisplay == 3:
+        reset_plane_to_default(viewer, data_name)
+        if prev_camera_pos is not None:
+            set_camera_view(viewer, prev_camera_pos)
+        if viewer.layers[label_3d_name]:
+            update_label_from_3d(viewer)
+            viewer.layers.remove(viewer.layers[label_3d_name])
+        viewer.layers[label_name].visible = True
+
  
 def shift_plane(layer, direction, padding_mode=False, padding=50):
     global plane_shift_status
@@ -946,9 +979,15 @@ def save_labels(viewer):
     print(labels_layer.data.shape, labels_layer.data.dtype)
     if label_3d_name in viewer.layers:
         update_label_from_3d(viewer)
-    label_header['saved_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    save_header = dict(label_header)
-    nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), labels_layer.data, header=save_header)
+    if ink_pred_path is not None and ink_pred_path != '':
+        nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_ink.nrrd"), labels_layer.data)
+    else:
+        if label_header is not None:
+            label_header['saved_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            save_header = dict(label_header)
+            nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), labels_layer.data, header=save_header)
+        else: 
+            nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), labels_layer.data)
     nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_raw.nrrd"), viewer.layers[data_name].data)
     msg = f"Layers saved to {output_path}"
     show_popup(msg)
@@ -1021,6 +1060,15 @@ gui.setup_napari_defaults()
 bind_hotkeys(viewer, hotkey_config)
 set_camera_view(viewer)
 setup_brush_size_listener(viewer, label_name)
+
+if ink_pred_path is not None and ink_pred_path != '':
+    viewer.window.add_plugin_dock_widget(
+        plugin_name="napari-threedee", widget_name="render plane manipulator"
+    )
+
+    viewer.window.add_plugin_dock_widget(
+        "napari-threedee", widget_name="label annotator"
+    )
 
 # Start the Napari event loop
 napari.run()

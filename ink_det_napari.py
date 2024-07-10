@@ -28,7 +28,7 @@ print(raw_zarr.info)
 d2 = da.from_zarr(raw_zarr)
 d2 = d2[z1:z2, x1:x2, y1:y2]
 
-bright_spot_mask_arr = bright_spot_mask(d2)
+bright_spot_mask_arr = bright_spot_mask_dask(d2)
 d2[bright_spot_mask_arr] = 30000
 
 d = d.transpose((2, 0, 1))

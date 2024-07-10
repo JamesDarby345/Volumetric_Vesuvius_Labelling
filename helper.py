@@ -19,8 +19,31 @@ from collections import deque
 import numba
 import zarr 
 import ast
+from sklearn.decomposition import PCA
 
-import numpy as np
+def find_best_intersecting_plane_napari(array_3d):
+    # Convert 3D array to point cloud
+    points = np.array(np.where(array_3d != 0)).T
+
+    # Apply PCA
+    pca = PCA(n_components=3)
+    pca.fit(points)
+
+    # The normal vector of the plane is the third principal component
+    normal_vector = pca.components_[2]
+
+    # Ensure the normal vector points "up" (positive z direction)
+    if normal_vector[2] < 0:
+        normal_vector = -normal_vector
+
+    # The point on the plane is the mean of all points
+    point_on_plane = np.mean(points, axis=0)
+
+    # Convert to Napari coordinates (x, y, z)
+    napari_position = point_on_plane
+    napari_normal = normal_vector
+
+    return napari_position, napari_normal
 
 def bright_spot_mask_dask(data):
     # Flatten the multi-dimensional Dask array

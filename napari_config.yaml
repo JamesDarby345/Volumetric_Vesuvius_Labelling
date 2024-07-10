@@ -7,12 +7,13 @@ cube_info:
   brush_size: 4
   use_zarr: False #True if using zarr for raw data instead of nrrd cubes, will still need nrrd mask cubes
   zarr_path: '/path/to/file.zarr'
+  ink_pred_path: '' #Keep empty if not using ink prediction zarrs
   author: '' #optional author name to add to metadata
   factor: 1.0 
 #Napari default keybinds will overwrite the custom keybinds in some modes
 #Thus, it is recommended to not use the default keybinds for custom keybinds
 #Keys with default functions include:
-#x,y,z,o,p,[,],-,=
+#x,y,z,o,p,[,],-,=,m,p,1,2,3,4,5
 customizable_hotkeys:
   toggle_labels_visibility: ["s","/"]
   toggle_data_visibility: ["w","."]
@@ -54,7 +55,8 @@ customizable_hotkeys:
   erode_labels: "i"
   dilate_labels: "u"
   connected_components: "'"
-  reset_plane_to_default: "m"
+  reset_plane_to_default: "b"
+  align_plane_with_selected_label: "n"
   save_labels: "h"
   decrease_brush_size: "Shift-z"
   increase_brush_size: "Shift-x"
