@@ -38,11 +38,14 @@ def find_nearest_valid_coord(num):
     remainder = difference % 256
 
     if remainder == 0:
-        return num
+        result = num
     elif remainder > 128:
-        return 2000 + 256 * (quotient + 1)
+        result = 2000 + 256 * (quotient + 1)
     else:
-        return 2000 + 256 * quotient
+        result = 2000 + 256 * quotient
+    
+    # Ensure the result is always greater than 0
+    return max(result, 208)
 
 
 def threshold_mask(array_3d, factor=1.0, min_size=200, hole_size=200):
