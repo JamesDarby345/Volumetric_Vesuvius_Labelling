@@ -56,6 +56,7 @@ customizable_hotkeys:
   dilate_labels: "u"
   connected_components: "'"
   reset_plane_to_default: "b"
+  reset_plane_view_to_default: "Shift-b"
   align_plane_with_selected_label: "n"
   save_labels: "h"
   decrease_brush_size: "Shift-z"
