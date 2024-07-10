@@ -451,7 +451,7 @@ def reset_plane_view_to_default(viewer):
         reset_plane_to_default(viewer, data_name)
         if prev_camera_pos is not None:
             set_camera_view(viewer, prev_camera_pos)
-        if viewer.layers[label_3d_name]:
+        if label_3d_name in viewer.layers:
             update_label_from_3d(viewer)
             viewer.layers.remove(viewer.layers[label_3d_name])
         viewer.layers[label_name].visible = True
