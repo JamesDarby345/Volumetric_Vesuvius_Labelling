@@ -760,11 +760,11 @@ def shift_data_right(viewer):
     if not right_timer.isActive():
         right_timer.start(30)  # Adjust the interval as needed
 
-def shift_data_left_fast(viewer):
-    move_left(viewer, 20)  # Move immediately on key press
+def shift_data_left_fast(viewer, distance=20):
+    move_left(viewer, distance)  # Move immediately on key press
 
-def shift_data_right_fast(viewer):
-    move_right(viewer, 20)  # Move immediately on key press
+def shift_data_right_fast(viewer, distance=20):
+    move_right(viewer, distance)  # Move immediately on key press
 
 # Function to stop timers when keys are released
 def stop_timers(event):
