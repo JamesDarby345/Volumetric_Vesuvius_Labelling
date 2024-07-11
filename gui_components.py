@@ -172,7 +172,6 @@ class VesuviusGUI:
         main_label_layer.brush_size = 4
         self.viewer.theme = 'light'
         self.viewer.window._qt_viewer.canvas.bgcolor = (0.68, 0.85, 0.90, 1.0)
-        main_label_layer.colormap = get_direct_label_colormap()
         main_label_layer.shape = 'square'
         self.viewer.layers.selection.active = main_label_layer
         # Prep layers visibility and blending

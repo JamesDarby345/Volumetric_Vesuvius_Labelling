@@ -34,8 +34,7 @@ def read_config(config_path='napari_config.yaml'):
             return config.get('cube_info',{}), config.get('customizable_hotkeys', {})
     return {}
 
-# config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
-config_path = 'ink_det_config.yaml' if os.path.exists('ink_det_config.yaml') else 'napari_config.yaml'
+config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
 
 cube_info, hotkey_config = read_config(config_path)
 
@@ -1064,6 +1063,7 @@ def update_global_erase_slice_width(value):
 # Create the GUI
 gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotkey_config, main_label_name)
 gui.setup_napari_defaults(main_label_name)
+papyrus_label_layer.colormap = get_direct_label_colormap()
 
 bind_hotkeys(viewer, hotkey_config)
 set_camera_view(viewer)
