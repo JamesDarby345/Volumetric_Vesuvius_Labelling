@@ -6,18 +6,19 @@ cube_info:
   pad_amount: 100
   brush_size: 4
 
-  nrrd_cube_path: '' #Leave blank if using default nrrd cube location, or a zarr for raw data
-  raw_data_zarr_path: '' #Ex: '/path/to/file.zarr'
-  ink_pred_zarr_path: '' #Keep empty if not using ink prediction zarrs
+  main_label_layer_name: 'papyrus' # 'papyrus' or 'ink', sets the main label layer for functions to act on.
+  nrrd_cube_path: '' # Leave blank if using default nrrd cube location, or a zarr for raw data
+  raw_data_zarr_path: '' # Ex: '/path/to/file.zarr'
+  ink_pred_zarr_path: '' # Keep empty if not using ink prediction zarrs
 
-  # variables to align raw data and ink pred axis
+  # Variables to align raw data and ink pred axis
   # if both raw data and ink pred zarrs of the same size are used, 
   # the variables can be left blank and the ink pred zarr axis 
   # will be automatically aligned to the raw data zarr axis
   raw_data_axis_order: 'zyx' 
   ink_pred_label_order: 'zyx'
-  ink_threshold: 150 #threshold value to binarize ink prediction zarr values for display as labels
-  author: '' #optional author name to add to metadata
+  ink_threshold: 150 # threshold value to binarize ink prediction zarr values for display as labels
+  author: '' # optional author name to add to metadata
   factor: 1.0 
 
 # Napari default keybinds will overwrite the custom keybinds in some modes

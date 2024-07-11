@@ -211,7 +211,7 @@ erase_mode = False
 global erase_slice_width
 erase_slice_width = 30
 
-if main_label_layer_name != 'ink':
+if main_label_layer_name != 'ink' or ink_pred_data is None:
     main_label_name = papyrus_label_name
 else: 
     main_label_name = ink_label_name
