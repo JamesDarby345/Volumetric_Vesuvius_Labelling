@@ -21,7 +21,7 @@ from vispy.util import keys
 from datetime import datetime
 from collections import defaultdict
 from napari_threedee.manipulators._qt import QtRenderPlaneManipulatorWidget
-from PyQt5.QtWidgets import QDockWidget
+from PyQt5.QtWidgets import QDockWidget, QApplication
 from PyQt5.QtCore import Qt
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
@@ -40,7 +40,7 @@ cube_info, hotkey_config = read_config(config_path)
 
 # Data location and size parameters
 scroll_name = cube_info.get('scroll_name', "")
-mask_factor = cube_info.get('factor', 1.0)
+papyrus_mask_factor = cube_info.get('factor', 1.0)
 zyx = cube_info.get('zyx', None)
 if not zyx:
     z = cube_info.get('z', '02000')
@@ -69,37 +69,57 @@ chunk_size = cube_info.get('chunk_size', 256)
 pad_amount = cube_info.get('pad_amount', 100)
 brush_size = cube_info.get('brush_size', 4)
 author = cube_info.get('author', '-')
-use_zarr = cube_info.get('use_zarr', False)
-ink_pred_path = cube_info.get('ink_pred_path', None)
+
+raw_data_axis_order = cube_info.get('raw_data_axis_order', 'zyx') #assumes zyx if not set
+ink_pred_label_axis_order = cube_info.get('ink_pred_label_axis_order', None)
+
+nrrd_cube_path = cube_info.get('nrrd_cube_path', None)
+raw_data_zarr_path = cube_info.get('raw_data_zarr_path', None)
+ink_pred_zarr_path = cube_info.get('ink_pred_zarr_path', None)
 
 current_directory = os.getcwd()
+if nrrd_cube_path is None or nrrd_cube_path == '':
+    nrrd_cube_path = os.path.join(current_directory, 'data', 'nrrd_cubes', scroll_name) 
+
+using_raw_data_zarr = False
+if raw_data_zarr_path is not None and raw_data_zarr_path != '':
+    using_raw_data_zarr = True
+    if not os.path.exists(raw_data_zarr_path):
+        print(f"raw_data_zarr_path does not exist: {ink_pred_zarr_path}, trying raw data nrrd cubes")
+        using_raw_data_zarr = False
+
+using_ink_pred_zarr = False
+if ink_pred_zarr_path is not None and ink_pred_zarr_path != '':
+    using_ink_pred_zarr = True
+    if not os.path.exists(ink_pred_zarr_path):
+        print(f"ink_pred_zarr_path does not exist: {ink_pred_zarr_path}, will try loading output nrrd ink label cube")
+        using_ink_pred_zarr = False
+
 pad_state = False
 padded_raw_data = []
 
 raw_data = None 
-data = None
 original_label_data = None
+original_ink_pred_data = None
 label_header = None
+raw_data_zarr_shape = None
 
-nrrd_cube_path = os.path.join(current_directory, 'data/nrrd_cubes') #Change to the path of the folder containing the nrrd cubes
-
-#nrrd zyx coord cubes
-if not use_zarr:
+#load in raw data
+if not using_raw_data_zarr:
     volume_file_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}', f'{z}_{y}_{x}_volume.nrrd')
     raw_data, _ = nrrd.read(volume_file_path)
     padded_raw_data = get_padded_nrrd_data(nrrd_cube_path, z, y, x, pad_amount)
-    data = raw_data
-else:
-    #use zarr is true
-    zarr_path = cube_info.get('zarr_path', "")
-    zarr_multi_res = zarr.open(zarr_path, mode='r')
 
-    raw_data = zarr_multi_res[0][z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
+else: #using raw data zarr
+    raw_data_zarr_multi_res = zarr.open(raw_data_zarr_path, mode='r')
+    raw_data_zarr_shape = raw_data_zarr_multi_res[0].shape
+    raw_data = raw_data_zarr_multi_res[0][z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
 
-    padded_raw_data = get_padded_data_zarr(zarr_multi_res[0], z_num, y_num, x_num, chunk_size, pad_amount)
-    data = raw_data
+    padded_raw_data = get_padded_data_zarr(raw_data_zarr_multi_res[0], z_num, y_num, x_num, chunk_size, pad_amount)
 
-#If padded raw data isnt setup, just set it to raw_data
+data = raw_data
+
+#If padded raw data isnt setup properly, set it to raw_data
 try:
     if padded_raw_data is None or len(padded_raw_data) == 0:
         padded_raw_data = raw_data
@@ -107,67 +127,31 @@ except Exception as e:
     print(f"An unexpected error occurred with padded_raw_data: {e}")
     padded_raw_data = raw_data
 
-#using ink predictions as labels for MVP
-if ink_pred_path is not None and ink_pred_path != '':
-    ink_threshold = cube_info.get('ink_threshold', 150)
-    file_path = os.path.join('output',f'volumetric_labels_{scroll_name}')
-    ink_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}",f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_ink.nrrd")
+#load in papyrus label data (mask)
+#potential paths
+output_folder_path = os.path.join(current_directory, 'output',f'volumetric_labels_{scroll_name}')
+saved_label_file_path = os.path.join(output_folder_path, f"{z}_{y}_{x}",f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
 
-    if os.path.exists(ink_path):
-        original_label_data, label_header = nrrd.read(ink_path)
-    else:
-        #get label from thresholded raw data
-        ink_pred_zarr = zarr.open(ink_pred_path, mode='r')
-        ink_pred_dask = da.from_zarr(ink_pred_zarr)
-        ink_pred_dask = ink_pred_dask.transpose((2, 0, 1))
-        # print(f"Zarr info: {ink_pred_zarr.info}")
-        print(f"Dask shape: {ink_pred_dask.shape}, ")
-        ink_pred_region = ink_pred_dask[z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
-        thresholded_data = np.array(da.where(ink_pred_region < ink_threshold, 0, 1)).astype(np.uint8)
-        original_label_data = thresholded_data
-    label_data = original_label_data
+nrrd_cube_folder_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}')
+mask_file_path = os.path.join(nrrd_cube_folder_path, f'{z}_{y}_{x}_mask.nrrd')
+
+#load saved label with highest priority
+#then load mask file with 2nd priority
+#then create mask from raw data thresholding with lowest priority
+if os.path.exists(saved_label_file_path):
+    original_label_data, label_header = nrrd.read(saved_label_file_path)
+elif os.path.exists(mask_file_path):
+    original_label_data, label_header = nrrd.read(mask_file_path)
 else:
-    mask_folder_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}')
-    mask_file_path = os.path.join(mask_folder_path, f'{z}_{y}_{x}_mask.nrrd')
-    if os.path.exists(mask_file_path):
-        original_label_data, label_header = nrrd.read(mask_file_path)
-    else:
-        #get label from thresholded raw data
-        original_label_data = threshold_mask(raw_data, factor=mask_factor).astype(np.uint8)
-        os.makedirs(mask_folder_path, exist_ok=True)
-        nrrd.write(mask_file_path, original_label_data)
-        original_label_data, label_header = nrrd.read(mask_file_path)
-    label_data = original_label_data
+    #make label from thresholded raw data
+    original_label_data = threshold_mask(raw_data, factor=papyrus_mask_factor).astype(np.uint8)
+    os.makedirs(nrrd_cube_folder_path, exist_ok=True)
+    print("Creating Papyrus Label from thresholded raw data, may take a few seconds...")
+    nrrd.write(mask_file_path, original_label_data)
+    original_label_data, label_header = nrrd.read(mask_file_path)
 
-# Initialize the Napari viewer
-viewer = napari.Viewer()
+label_data = original_label_data
 
-#layer name variables
-label_name = 'Labels'
-data_name = 'Data'
-ff_name = 'Flood Fill'
-cc_preview_name = 'Connected Components Preview'
-label_3d_name = '3D Label Edit Layer'
-pad_state = False
-global erase_mode
-erase_mode = False
-cut_side = True
-plane_shift_status = False
-eraser_size = 4
-
-global erase_slice_width
-erase_slice_width = 30
-
-# Add the 3D data to the viewer
-image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
-labels_layer = viewer.add_labels(label_data, name=label_name)
-
-#load saved labels if they exist
-file_path = os.path.join('output',f'volumetric_labels_{scroll_name}')
-label_path = os.path.join(current_directory, file_path, f"{z}_{y}_{x}",f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
-if os.path.exists(label_path):
-    label_data, label_header = nrrd.read(label_path)
-    labels_layer.data = label_data
 if label_header is not None:
     print(label_header)
     label_header = defaultdict(list, label_header)
@@ -177,10 +161,65 @@ if label_header is not None:
     if 'author' not in label_header and author is not None and author != '':
         label_header['author'] = author
 
-padded_labels = np.pad(label_data, pad_width=pad_amount, mode='constant', constant_values=0)
+#load in ink prediction label if it exists
+saved_ink_pred_file_path = os.path.join(output_folder_path, f"{z}_{y}_{x}",f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_ink_label.nrrd")
+
+if os.path.exists(saved_ink_pred_file_path):
+    original_ink_pred_data, _ = nrrd.read(saved_ink_pred_file_path)
+elif using_ink_pred_zarr:
+    ink_threshold = cube_info.get('ink_threshold', 150)
+    ink_pred_zarr = zarr.open(ink_pred_zarr_path, mode='r')
+    ink_pred_dask = da.from_zarr(ink_pred_zarr)
+
+    #Attempt to align the ink prediction label with the raw data if information is available
+    if raw_data_axis_order is None or ink_pred_label_axis_order is None and raw_data_zarr_shape is not None:
+        transpose_params = get_transpose_params_from_shapes(raw_data_zarr_shape, ink_pred_dask.shape) 
+        ink_pred_dask = ink_pred_dask.transpose(transpose_params)
+        print("raw data zarr shape:", raw_data_zarr_shape,"transposed ink pred dask shape: ", ink_pred_dask.shape)
+    elif raw_data_axis_order is not None and ink_pred_label_axis_order is not None:
+        #use the both of the assigned manual axis order to align the ink label dask array to the raw data zarr array
+        transpose_params = get_transpose_params_from_axis_order(raw_data_axis_order, ink_pred_label_axis_order)
+        ink_pred_dask = ink_pred_dask.transpose(transpose_params)
+    else:
+        print("Could not ensure alignment of ink prediction label with raw data, using default axis order. Please check the axis order of the raw data and ink prediction label and set it in the config file if incorrect")
+    
+    ink_pred_region = ink_pred_dask[z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
+    thresholded_data = np.array(da.where(ink_pred_region < ink_threshold, 0, 1)).astype(np.uint8)
+    original_ink_pred_data = thresholded_data
+
+ink_pred_data = original_ink_pred_data
+
+# Initialize the Napari viewer
+viewer = napari.Viewer()
+
+#layer name variables
+label_name = 'Papyrus Labels'
+ink_label_name = 'Ink Labels'
+data_name = 'Data'
+ff_name = 'Flood Fill'
+cc_preview_name = 'Connected Components Preview'
+label_3d_name = '3D Label Edit Layer'
+pad_state = False
+cut_side = True
+plane_shift_status = False
+eraser_size = 4
+
+global erase_mode
+erase_mode = False
+global erase_slice_width
+erase_slice_width = 30
+
+# Add the 3D data to the viewer
+image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
+labels_layer = viewer.add_labels(label_data, name=label_name)
+if ink_pred_data is not None:
+    ink_labels_layer = viewer.add_labels(ink_pred_data, name=ink_label_name)
 
 def align_plane_with_selected_label(viewer):
-    labels_layer = viewer.layers[label_name]
+    if ink_pred_data is None or (not viewer.layers[ink_label_name].visible and viewer.layers[label_name].visible):
+        align_layer = viewer.layers[label_name]
+    else:
+        align_layer = viewer.layers[ink_label_name]
     data_layer = viewer.layers[data_name]
     
     # Check if data layer is visible and depicted as a plane
@@ -189,12 +228,12 @@ def align_plane_with_selected_label(viewer):
         return
     
     # Get the selected label value
-    selected_label = labels_layer.selected_label
+    selected_label = align_layer.selected_label
     if selected_label == 0:
         print("No label selected.")
         return
     
-    masked_labels = (labels_layer.data == selected_label).astype(np.uint8)
+    masked_labels = (align_layer.data == selected_label).astype(np.uint8)
     position, normal = find_best_intersecting_plane_napari(masked_labels)
     data_layer.plane.position = position
     data_layer.plane.normal = normal
@@ -272,23 +311,6 @@ def toggle_show_selected_label(viewer):
     labels_layer.show_selected_label = not labels_layer.show_selected_label
     if label_3d_name in viewer.layers:
         viewer.layers[label_3d_name].show_selected_label = not viewer.layers[label_3d_name].show_selected_label
-
-def capture_cursor_info(event):
-    # Get cursor position in world coordinates
-    position = viewer.cursor.position
-
-    # Convert world coordinates to data indices
-    indices = tuple(int(np.round(coord)) for coord in position)
-
-    # Get the value of the label under the cursor
-    label_value = labels_layer.data[indices]
-
-    # Print the cursor position and label value
-    print(f"Cursor Position: {indices}, Label Value: {label_value}")
-    labels_layer.selected_label = label_value
-
-def label_picker(event):
-    capture_cursor_info(event)
 
 # Add an empty labels layer for the flood fill result
 flood_fill_layer = viewer.add_labels(np.zeros_like(data), name=ff_name)
@@ -401,7 +423,6 @@ def erode_dilate_labels_worker(data, erode=True, erosion_iterations=1, dilation_
     
     return result
 
-# Function to call from your Napari UI
 def erode_dilate_labels(viewer, data, erode=True, erosion_iterations=1, dilation_iterations=1):
     worker = erode_dilate_labels_worker(data, erode, erosion_iterations, dilation_iterations)
     
@@ -452,11 +473,10 @@ def reset_plane_view_to_default(viewer):
         if prev_camera_pos is not None:
             set_camera_view(viewer, prev_camera_pos)
         if label_3d_name in viewer.layers:
-            update_label_from_3d(viewer)
+            update_label_from_3d_edit_layer(viewer)
             viewer.layers.remove(viewer.layers[label_3d_name])
         viewer.layers[label_name].visible = True
 
- 
 def shift_plane(layer, direction, padding_mode=False, padding=50):
     global plane_shift_status
     plane_shift_status = True
@@ -494,7 +514,7 @@ def shift_plane(layer, direction, padding_mode=False, padding=50):
 def full_label_view(viewer):
     global prev_camera_pos
     if label_3d_name in viewer.layers:
-            update_label_from_3d(viewer)
+            update_label_from_3d_edit_layer(viewer)
     if viewer.dims.ndisplay == 2:
         viewer.dims.ndisplay = 3
         for layer in viewer.layers:
@@ -521,7 +541,7 @@ def full_label_view(viewer):
 def switch_to_plane_view(viewer):
     global prev_camera_pos
     if label_3d_name in viewer.layers:
-            update_label_from_3d(viewer)
+            update_label_from_3d_edit_layer(viewer)
    # Switch to 3D mode
     if viewer.dims.ndisplay == 3:
         prev_camera_pos = get_current_camera_info(viewer)
@@ -565,7 +585,7 @@ def switch_to_plane_view(viewer):
         if prev_camera_pos is not None:
             set_camera_view(viewer, prev_camera_pos)
 
-def update_label_from_3d(viewer):
+def update_label_from_3d_edit_layer(viewer):
     global previous_label_3d_data, manual_changes_mask
 
     if label_3d_name in viewer.layers and label_name in viewer.layers:
@@ -646,7 +666,7 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     labels_layer = viewer.layers[label_name]
 
     # Update label_name layer from label_3d_name layer if it exists
-    update_label_from_3d(viewer)
+    update_label_from_3d_edit_layer(viewer)
 
     # Create a copy of the label data and set all voxels between the viewer and the plane to 0
     new_label_data = labels_layer.data.copy()
@@ -687,7 +707,6 @@ def shift_data_left_and_recut_3d_label(viewer):
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side, recut=True)
 
-#@viewer.bind_key('Shift-Left', overwrite=True)
 def shift_data_left_fast_and_recut_3d_label(viewer):
     global erase_mode, cut_side, erase_slice_width
     if erase_mode:
@@ -697,16 +716,12 @@ def shift_data_left_fast_and_recut_3d_label(viewer):
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side, recut=True)
 
-#keybind Right arrow to shift the plane along the normal vector in 3d viewing mode
-#@viewer.bind_key('Right', overwrite=True)
 def shift_data_right_and_recut_3d_label(viewer):
     global erase_mode, cut_side
     shift_plane(viewer.layers[data_name], 1)
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side, recut=True)
 
-#keybind Right arrow + shift to shift the plane along the normal vector 20 in 3d viewing mode
-#@viewer.bind_key('Shift-Right', overwrite=True)
 def shift_data_right_fast_and_recut_3d_label(viewer):
     global erase_mode, cut_side, erase_slice_width
     if erase_mode:
@@ -720,10 +735,12 @@ def shift_data_right_fast_and_recut_3d_label(viewer):
 def move_left(viewer, distance=1):
     # viewer.window._qt_viewer.viewer.dims._increment_dims_left()
     shift_plane(viewer.layers[data_name], -distance)
+    QApplication.processEvents()
 
 def move_right(viewer, distance=1):
     # viewer.window._qt_viewer.viewer.dims._increment_dims_right()
     shift_plane(viewer.layers[data_name], distance)
+    QApplication.processEvents()
 
 # Create timers for holding keys
 left_timer = QTimer()
@@ -734,25 +751,21 @@ left_timer.timeout.connect(lambda: move_left(viewer))
 right_timer.timeout.connect(lambda: move_right(viewer))
 
 # Define the key press events
-#@viewer.bind_key('a', overwrite=True)
 def shift_data_left(viewer):
     move_left(viewer)  # Move immediately on key press
     if not left_timer.isActive():
-        left_timer.start(50)  # Adjust the interval as needed
+        left_timer.start(30)  # Adjust the interval as needed
 
-#@viewer.bind_key('d', overwrite=True)
 def shift_data_right(viewer):
     move_right(viewer)  # Move immediately on key press
     if not right_timer.isActive():
-        right_timer.start(50)  # Adjust the interval as needed
+        right_timer.start(30)  # Adjust the interval as needed
 
 def shift_data_left_fast(viewer):
     move_left(viewer, 20)  # Move immediately on key press
 
 def shift_data_right_fast(viewer):
     move_right(viewer, 20)  # Move immediately on key press
-
-
 
 # Function to stop timers when keys are released
 def stop_timers(event):
@@ -764,8 +777,6 @@ def stop_timers(event):
 # Connect the key release event to the function
 viewer.window._qt_viewer.canvas.events.key_release.connect(stop_timers)
 
-#keybind ' to switch to eraser on the 3d label layer
-#@viewer.bind_key('\'')
 def erase_mode_toggle(viewer):
     global eraser_size
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
@@ -778,8 +789,6 @@ def erase_mode_toggle(viewer):
         viewer.layers[label_name].mode = 'erase'
         viewer.layers.selection.active = viewer.layers[label_name]
 
-#keybind , to enable the 3d slice erase mode
-#@viewer.bind_key(',')
 def plane_erase_3d_mode(viewer, switch=True):
     global erase_mode, cut_side, plane_shift_status, prev_erase_plane_info_var
     if not erase_mode:
@@ -794,16 +803,12 @@ def plane_erase_3d_mode(viewer, switch=True):
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
         viewer.layers[label_name].visible = False
 
-#keybind ; to enable 3d pan_zoom/move mode
-#@viewer.bind_key(';')
 def move_mode(viewer):
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         viewer.layers[label_3d_name].mode = 'pan_zoom'
     else:
         viewer.layers[label_name].mode = 'pan_zoom'
 
-# keybind k to cut the label layer at the oblique plane, also called by left and right arrow
-#@viewer.bind_key('k', overwrite=True)
 def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
     global erase_mode, cut_side, plane_shift_status
     if erase_mode:
@@ -816,13 +821,11 @@ def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
         viewer.layers[label_3d_name].visible = True
         viewer.layers[label_name].visible = False
 
-#run connected components on the labels layer to get instance segmentations
-#@viewer.bind_key('c')
-def connected_components(viewer, preview=False):
+def connected_components(viewer, preview=False, cc_layer_name=label_name):
     global erase_mode, cut_side
-    msg = 'connected components'
-    viewer.status = msg
-    print(msg)
+
+    if not preview and labels_layer.data is not None and ink_pred_data is not None:
+        cc_layer_name = select_from_list_popup("Connected Components", "Select the layer to apply connected components to", [label_name, ink_label_name])
     if not preview:
         msg = "DANGER Are you sure you want to run connected components? This operation cannot be undone and removes the undo queue. Consider saving first. \n\nIF YOU HAVE DILATED SEPERATED LABELS AND THEY NOW TOUCH, THEY WILL BE COMBINED."
         response = confirm_popup(msg)
@@ -831,16 +834,17 @@ def connected_components(viewer, preview=False):
 
     #apply any changes to the label_3d_name layer to the labels layer
     if label_3d_name in viewer.layers:
-        update_label_from_3d(viewer)
+        update_label_from_3d_edit_layer(viewer)
 
-    if label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible and preview:
+    if  preview and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cc_data = viewer.layers[label_3d_name].data.copy()
     else:
-        cc_data = labels_layer.data.copy()
+        cc_data = viewer.layers[cc_layer_name].data.copy()
     print(np.sum(cc_data > 0))
 
-    cc_result = label_foreground_structures_napari(cc_data, min_size=200)
-    
+    cc_result = label_foreground_structures_napari(cc_data, min_size=10)
+    print(cc_result.shape)
+    print(np.sum(cc_result > 0))
     if preview:
         if cc_preview_name in viewer.layers:
             viewer.layers[cc_preview_name].data = cc_result
@@ -853,7 +857,7 @@ def connected_components(viewer, preview=False):
         if label_3d_name in viewer.layers:
             viewer.layers[label_3d_name].visible = False
     else:
-        labels_layer.data = cc_result
+        viewer.layers[cc_layer_name].data = cc_result
     
     if label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
@@ -863,7 +867,6 @@ def connected_components(viewer, preview=False):
     viewer.status = msg
     print(msg)
 
-#keybind j to add context padding to the data layer
 def add_padding_contextual_data(viewer):
     global pad_state, previous_label_3d_data, manual_changes_mask
     if padded_raw_data.shape == raw_data.shape:
@@ -907,8 +910,6 @@ def add_padding_contextual_data(viewer):
         viewer.camera.center = (viewer.camera.center[0] + pad_amount, viewer.camera.center[1] + pad_amount, viewer.camera.center[2] + pad_amount)
         pad_state = True
 
-#keybind i to erode the labels layer
-#@viewer.bind_key('i')
 def erode_labels(viewer):
     global pad_state
     msg = 'eroding labels'
@@ -972,16 +973,16 @@ def save_labels(viewer):
         show_popup(msg)
         return
     current_directory = os.getcwd()
-    file_path = os.path.join('output',f'volumetric_labels_{scroll_name}/{z}_{y}_{x}')
+    file_path = os.path.join('output',f'volumetric_labels_{scroll_name}',f'{z}_{y}_{x}')
     output_path = os.path.join(current_directory, file_path)
     if not os.path.exists(output_path):
         os.makedirs(output_path)
     print(labels_layer.data.shape, labels_layer.data.dtype)
     if label_3d_name in viewer.layers:
-        update_label_from_3d(viewer)
-    if ink_pred_path is not None and ink_pred_path != '':
-        nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_ink.nrrd"), labels_layer.data)
-    else:
+        update_label_from_3d_edit_layer(viewer)
+    if ink_pred_data is not None:
+        nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_ink_label.nrrd"), ink_labels_layer.data)
+    if labels_layer.data is not None:
         if label_header is not None:
             label_header['saved_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             save_header = dict(label_header)
@@ -1002,7 +1003,6 @@ def connected_components_preview(viewer):
     else:
         connected_components(viewer, preview=True)
     
-
 def bind_hotkeys(viewer, config, module=None, overwrite=True):
     if module is None:
         module = sys.modules['__main__']  # Get the main module
@@ -1061,7 +1061,8 @@ bind_hotkeys(viewer, hotkey_config)
 set_camera_view(viewer)
 setup_brush_size_listener(viewer, label_name)
 
-if ink_pred_path is not None and ink_pred_path != '':
+# Add the threedee plugin dock widgets if using ink prediction data
+if ink_pred_data is not None:
     viewer.window.add_plugin_dock_widget(
         plugin_name="napari-threedee", widget_name="render plane manipulator"
     )

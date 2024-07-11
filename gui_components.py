@@ -157,13 +157,14 @@ class VesuviusGUI:
 
     def setup_napari_defaults(self):
         viewer = self.viewer
-        label_name = 'Labels'
+        label_name = 'Papyrus Labels'
+        ink_label_name = 'Ink Labels'
         data_name = 'Data'
         ff_name = 'flood_fill_layer'
         label_3d_name = '3D Label Edit Layer'
         self.viewer.axes.visible = True
         self.viewer.dims.ndisplay = 3   
-        labels_layer = self.viewer.layers[self.get_label_layer_name()]
+        labels_layer = self.viewer.layers[label_name]
         labels_layer.n_edit_dimensions = 3
         labels_layer.opacity = 1
         labels_layer.contour = 1
@@ -284,8 +285,3 @@ class VesuviusGUI:
         - {get_key_string('interpolate_borders')} to extrapolate sparse compressed class labels<br>
         """
         return instruction_text
-
-    @staticmethod
-    def get_label_layer_name():
-        # Return the label name here
-        return "Labels"

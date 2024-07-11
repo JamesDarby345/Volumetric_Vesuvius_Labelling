@@ -1,19 +1,29 @@
 cube_info:
-#cube z,y,x coords to load correct raw data & mask cubes
+  #cube z,y,x coords to load correct raw data & mask cubes
   zyx: '00000_00000_00000'
   scroll_name: 's1'
   chunk_size: 256
   pad_amount: 100
   brush_size: 4
-  use_zarr: False #True if using zarr for raw data instead of nrrd cubes, will still need nrrd mask cubes
-  zarr_path: '/path/to/file.zarr'
-  ink_pred_path: '' #Keep empty if not using ink prediction zarrs
+
+  nrrd_cube_path: '' #Leave blank if using default nrrd cube location, or a zarr for raw data
+  raw_data_zarr_path: '' #Ex: '/path/to/file.zarr'
+  ink_pred_zarr_path: '' #Keep empty if not using ink prediction zarrs
+
+  # variables to align raw data and ink pred axis
+  # if both raw data and ink pred zarrs of the same size are used, 
+  # the variables can be left blank and the ink pred zarr axis 
+  # will be automatically aligned to the raw data zarr axis
+  raw_data_axis_order: 'zyx' 
+  ink_pred_label_order: 'zyx'
+  ink_threshold: 150 #threshold value to binarize ink prediction zarr values for display as labels
   author: '' #optional author name to add to metadata
   factor: 1.0 
-#Napari default keybinds will overwrite the custom keybinds in some modes
-#Thus, it is recommended to not use the default keybinds for custom keybinds
-#Keys with default functions include:
-#x,y,z,o,p,[,],-,=,m,p,1,2,3,4,5
+
+# Napari default keybinds will overwrite the custom keybinds in some modes
+# Thus, it is recommended to not use the default keybinds for custom keybinds
+# Keys with default functions include:
+# x,y,z,o,p,[,],-,=,m,p,1,2,3,4,5
 customizable_hotkeys:
   toggle_labels_visibility: ["s","/"]
   toggle_data_visibility: ["w","."]
@@ -55,12 +65,13 @@ customizable_hotkeys:
   erode_labels: "i"
   dilate_labels: "u"
   connected_components: "'"
+  #TODO: document these new keybinds
   reset_plane_to_default: "b"
   reset_plane_view_to_default: "Shift-b"
   align_plane_with_selected_label: "n"
+
   save_labels: "h"
   decrease_brush_size: "Shift-z"
   increase_brush_size: "Shift-x"
-  label_picker: ""
   toggle_show_selected_label: ""
   set_corner_view: ""

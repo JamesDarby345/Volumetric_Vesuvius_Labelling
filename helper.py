@@ -11,6 +11,7 @@ from scipy.interpolate import interp1d
 import os
 import nrrd
 from qtpy.QtWidgets import QMessageBox
+from PyQt5.QtWidgets import QInputDialog, QWidget
 from napari.utils.colormaps import DirectLabelColormap
 from collections import defaultdict
 from vispy.scene.cameras.perspective import PerspectiveCamera
@@ -20,6 +21,37 @@ import numba
 import zarr 
 import ast
 from sklearn.decomposition import PCA
+from skimage import measure
+
+
+def get_transpose_params_from_shapes(shape1, shape2):
+    # Check if the shapes have the same number of dimensions
+    if len(shape1) != len(shape2) or len(shape1) != 3:
+        raise ValueError("Both shapes must be 3-dimensional")
+
+    # Check if the shapes have the same total number of elements
+    if np.prod(shape1) != np.prod(shape2):
+        raise ValueError(f"Shapes must represent the same total number of elements: {shape1}, {shape2}")
+
+    # Find the permutation of axes
+    permutation = [shape2.index(s) for s in shape1]
+
+    return tuple(permutation)
+
+def get_transpose_params_from_axis_order(source_order, target_order):
+    if len(source_order) != 3 or len(target_order) != 3:
+        raise ValueError("Both orders must be 3-dimensional (e.g., 'zyx')")
+    
+    if set(source_order) != set(target_order):
+        raise ValueError("Both orders must contain the same axes (x, y, and z)")
+    
+    # Create a dictionary mapping each axis in the source to its index
+    source_indices = {axis: index for index, axis in enumerate(source_order)}
+    
+    # Create the transpose parameters by looking up each target axis in the source
+    transpose_params = tuple(source_indices[axis] for axis in target_order)
+    
+    return transpose_params
 
 def find_best_intersecting_plane_napari(array_3d):
     # Convert 3D array to point cloud
@@ -236,6 +268,15 @@ def confirm_popup(message):
     msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
     return msg.exec_()
 
+def select_from_list_popup(title, message, options):
+    parent = QWidget()  # You might want to pass a proper parent widget if available
+    selected_item, ok = QInputDialog.getItem(parent, title, message, options, 0, False)
+    
+    if ok and selected_item:
+        return selected_item
+    else:
+        return None
+
 def get_padded_data_zarr(zarr_arr, z_num, y_num, x_num, chunk_size, pad_amount):
     # Get the shape of the zarr array
     z_shape, y_shape, x_shape = zarr_arr.shape
@@ -377,8 +418,39 @@ def limited_bfs_flood_fill(data, start_coords, max_distance):
 
     return filled
 
-def label_foreground_structures_napari(input_array, min_size=1000):
-    # Find connected components in the foreground (value 2)
+# def label_foreground_structures_napari(input_array, min_size=10, chunk_size=200):
+#     foreground = input_array > 0
+#     shape = foreground.shape
+#     labeled_array = np.zeros(shape, dtype=np.int32)
+#     max_label = 0
+
+#     for z in range(0, shape[0], chunk_size):
+#         for y in range(0, shape[1], chunk_size):
+#             for x in range(0, shape[2], chunk_size):
+#                 chunk = foreground[z:z+chunk_size, y:y+chunk_size, x:x+chunk_size]
+#                 chunk_labeled = measure.label(chunk, connectivity=3)
+#                 chunk_labeled[chunk_labeled > 0] += max_label
+#                 labeled_array[z:z+chunk_size, y:y+chunk_size, x:x+chunk_size] = chunk_labeled
+#                 max_label = labeled_array.max()
+
+#     # Measure the size of each connected component
+#     structure_sizes = np.bincount(labeled_array.ravel())
+    
+#     # Create a mask to remove small structures
+#     remove_mask = structure_sizes < min_size
+#     remove_mask[0] = 0  # Ensure the background is not removed
+
+#     # Remove small structures
+#     labeled_array[remove_mask[labeled_array]] = 0
+
+#     # Relabel the structures after removal
+#     labeled_array, num_features = measure.label(labeled_array > 0, return_num=True, connectivity=3)
+
+#     print(f"Number of connected foreground structures after filtering: {num_features}")
+
+#     return labeled_array
+
+def label_foreground_structures_napari(input_array, min_size=10):
     foreground = input_array > 0
 
     # Label connected components
@@ -566,18 +638,15 @@ def get_slicer_colormap():
         14: [250, 250, 210, 255],
         15: [244, 214, 49, 255],
         16: [0, 151, 206, 255],
-        17: [216, 101, 79, 255],
         18: [183, 156, 220, 255],
         19: [183, 214, 211, 255],
         20: [152, 189, 207, 255],
-        21: [111, 184, 210, 255],
         22: [178, 212, 242, 255],
         23: [68, 172, 100, 255],
         24: [111, 197, 131, 255],
         25: [85, 188, 255, 255],
         26: [0, 145, 30, 255],
         27: [214, 230, 130, 255],
-        28: [78, 63, 0, 255],
         29: [218, 255, 255, 255],
         30: [170, 250, 250, 255],
         31: [140, 224, 228, 255],
@@ -585,12 +654,156 @@ def get_slicer_colormap():
         33: [216, 191, 216, 255],
         34: [145, 60, 66, 255],
         35: [150, 98, 83, 255],
-        36: [177, 122, 101, 255],
-        37: [244, 214, 49, 255],
-        38: [250, 250, 225, 255],
         39: [200, 200, 215, 255],
         40: [68, 131, 98, 255],
+        42: [83, 146, 164, 255],
+        44: [162, 115, 105, 255],
+        46: [141, 93, 137, 255],
+        48: [182, 166, 110, 255],
+        50: [188, 135, 166, 255],
+        52: [154, 150, 201, 255],
+        54: [177, 140, 190, 255],
+        56: [30, 111, 85, 255],
+        58: [210, 157, 166, 255],
+        60: [48, 129, 126, 255],
+        62: [98, 153, 112, 255],
+        64: [69, 110, 53, 255],
+        65: [166, 113, 137, 255],
+        66: [122, 101, 38, 255],
+        68: [253, 135, 192, 255],
+        69: [145, 92, 109, 255],
+        70: [46, 101, 131, 255],
+        73: [250, 250, 225, 255],
+        74: [127, 150, 88, 255],
+        76: [159, 116, 163, 255],
+        78: [125, 102, 154, 255],
+        80: [106, 174, 155, 255],
+        82: [154, 146, 83, 255],
+        84: [126, 126, 55, 255],
+        85: [201, 160, 133, 255],
+        87: [78, 152, 141, 255],
+        89: [174, 140, 103, 255],
+        91: [139, 126, 177, 255],
+        93: [148, 120, 72, 255],
+        95: [186, 135, 135, 255],
+        97: [99, 106, 24, 255],
+        98: [156, 171, 108, 255],
+        100: [64, 123, 147, 255],
+        102: [138, 95, 74, 255],
+        103: [97, 113, 158, 255],
+        104: [126, 161, 197, 255],
+        105: [194, 195, 164, 255],
+        107: [88, 106, 215, 255],
+        115: [244, 214, 49, 255],
+        116: [200, 200, 215, 255],
+        118: [82, 174, 128, 255],
+        119: [57, 157, 110, 255],
+        120: [60, 143, 83, 255],
+        121: [92, 162, 109, 255],
+        122: [255, 244, 209, 255],
+        126: [201, 121, 77, 255],
+        127: [70, 163, 117, 255],
+        128: [188, 91, 95, 255],
+        130: [166, 84, 94, 255],
+        131: [182, 105, 107, 255],
+        132: [229, 147, 118, 255],
+        134: [174, 122, 90, 255],
+        136: [201, 112, 73, 255],
+        138: [194, 142, 0, 255],
+        140: [241, 213, 144, 255],
+        141: [203, 179, 77, 255],
+        143: [229, 204, 109, 255],
+        145: [255, 243, 152, 255],
+        147: [209, 185, 85, 255],
+        149: [248, 223, 131, 255],
+        151: [255, 230, 138, 255],
+        152: [196, 172, 68, 255],
+        153: [255, 255, 167, 255],
+        154: [255, 250, 160, 255],
+        155: [255, 237, 145, 255],
+        156: [242, 217, 123, 255],
+        158: [222, 198, 101, 255],
+        160: [213, 124, 109, 255],
+        161: [184, 105, 108, 255],
+        162: [150, 208, 243, 255],
+        163: [62, 162, 114, 255],
+        166: [242, 206, 142, 255],
+        167: [250, 210, 139, 255],
+        168: [255, 255, 207, 255],
+        170: [182, 228, 255, 255],
+        171: [175, 216, 244, 255],
+        172: [197, 165, 145, 255],
+        174: [172, 138, 115, 255],
+        176: [202, 164, 140, 255],
+        177: [224, 186, 162, 255],
+        179: [255, 245, 217, 255],
+        180: [206, 110, 84, 255],
+        181: [210, 115, 89, 255],
+        182: [203, 108, 81, 255],
+        183: [233, 138, 112, 255],
+        184: [195, 100, 73, 255],
+        185: [181, 85, 57, 255],
+        186: [152, 55, 13, 255],
+        187: [159, 63, 27, 255],
+        188: [166, 70, 38, 255],
+        189: [218, 123, 97, 255],
+        190: [225, 130, 104, 255],
+        191: [224, 97, 76, 255],
+        193: [184, 122, 154, 255],
+        194: [211, 171, 143, 255],
+        195: [47, 150, 103, 255],
+        197: [173, 121, 88, 255],
+        198: [188, 95, 76, 255],
+        199: [255, 239, 172, 255],
+        200: [226, 202, 134, 255],
+        201: [253, 232, 158, 255],
+        202: [244, 217, 154, 255],
+        203: [205, 179, 108, 255],
+        205: [186, 124, 161, 255],
+        207: [255, 255, 220, 255],
+        208: [234, 234, 194, 255],
+        209: [204, 142, 178, 255],
+        210: [180, 119, 153, 255],
+        211: [216, 132, 105, 255],
+        212: [255, 253, 229, 255],
+        213: [205, 167, 142, 255],
+        214: [204, 168, 143, 255],
+        215: [255, 224, 199, 255],
+        217: [0, 145, 30, 255],
+        218: [139, 150, 98, 255],
+        219: [249, 180, 111, 255],
+        220: [157, 108, 162, 255],
+        221: [203, 136, 116, 255],
+        222: [185, 102, 83, 255],
+        224: [247, 182, 164, 255],
+        226: [222, 154, 132, 255],
+        227: [124, 186, 223, 255],
+        228: [249, 186, 150, 255],
+        230: [244, 170, 147, 255],
+        231: [255, 181, 158, 255],
+        232: [255, 190, 165, 255],
+        233: [227, 153, 130, 255],
+        234: [213, 141, 113, 255],
+        236: [193, 123, 103, 255],
+        237: [216, 146, 127, 255],
+        238: [230, 158, 140, 255],
+        239: [245, 172, 147, 255],
+        241: [241, 172, 151, 255],
+        243: [177, 124, 92, 255],
+        244: [171, 85, 68, 255],
+        245: [217, 198, 131, 255],
+        246: [212, 188, 102, 255],
+        247: [185, 135, 134, 255],
+        249: [198, 175, 125, 255],
+        250: [194, 98, 79, 255],
+        250: [194, 98, 79, 255],
+        251: [255, 226, 77, 255],
+        252: [224, 194, 0, 255],
+        253: [0, 147, 202, 255],
+        254: [240, 255, 30, 255],
+        255: [185, 232, 61, 255],
     }
+
 
 def get_direct_label_colormap():
     slicer_colormap = get_slicer_colormap()
