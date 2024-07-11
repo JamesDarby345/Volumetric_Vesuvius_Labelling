@@ -21,8 +21,7 @@ from vispy.util import keys
 from datetime import datetime
 from collections import defaultdict
 from napari_threedee.manipulators._qt import QtRenderPlaneManipulatorWidget
-from PyQt5.QtWidgets import QDockWidget, QApplication
-from PyQt5.QtCore import Qt
+
 
 import asyncio
 from qasync import QEventLoop, QApplication
@@ -70,6 +69,7 @@ if scroll_name == 's1' and not is_valid_coord([z_num, y_num, x_num]):
     x = str(x_num).zfill(5)
 
 chunk_size = cube_info.get('chunk_size', 256)
+global pad_amount
 pad_amount = cube_info.get('pad_amount', 100)
 brush_size = cube_info.get('brush_size', 4)
 author = cube_info.get('author', '-')
@@ -618,7 +618,7 @@ def update_label_from_3d_edit_layer(viewer):
             viewer.layers[main_label_name].refresh()
 
 def setup_label_3d_layer(viewer, new_label_data, active_mode):
-    global brush_size
+    global brush_size, pad_state, pad_amount
 
     # Remove the old label_3d_name layer if it exists
     visible_state = True
@@ -627,15 +627,20 @@ def setup_label_3d_layer(viewer, new_label_data, active_mode):
         viewer.layers.remove(viewer.layers[label_3d_name])
     
     # Add a new label layer with the updated data
-    viewer.add_labels(new_label_data, name=label_3d_name)
-    viewer.layers[label_3d_name].colormap = get_direct_label_colormap()
+    new_label_layer = viewer.add_labels(new_label_data, name=label_3d_name)
+    new_label_layer.colormap = get_direct_label_colormap()
     
-    new_label_layer = viewer.layers[label_3d_name]
     new_label_layer.visible = visible_state
     new_label_layer.blending = 'opaque'
     new_label_layer.opacity = 1
     new_label_layer.mode = active_mode
     new_label_layer.brush_size = brush_size
+
+    # Apply translation if pad_state is True
+    if pad_state:
+        new_label_layer.translate = [pad_amount, pad_amount, pad_amount]
+    else:
+        new_label_layer.translate = [0, 0, 0]
 
     setup_brush_size_listener(viewer, label_3d_name)
 
@@ -645,7 +650,7 @@ def setup_label_3d_layer(viewer, new_label_data, active_mode):
     return new_label_layer
 
 def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=None, recut=False):
-    global previous_label_3d_data, manual_changes_mask, prev_plane_info_var, erase_slice_width, plane_shift_status
+    global previous_label_3d_data, manual_changes_mask, prev_plane_info_var, erase_slice_width, plane_shift_status, pad_state, pad_amount
     plane_shift_status = False
     data_plane = viewer.layers[data_name]
     if data_plane.depiction != 'plane':
@@ -667,14 +672,21 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
         prev_plane_info_var = {'position': position, 'normal': normal}
     viewer.layers[data_name].blending = 'opaque'
 
+    # Adjust position based on pad_state
+    offset = pad_amount if pad_state else 0
+    adjusted_position = position - offset
+
     # Create a meshgrid for the label data coordinates
-    z, y, x = np.meshgrid(np.arange(viewer.layers[main_label_name].data.shape[0]),
-                          np.arange(viewer.layers[main_label_name].data.shape[1]),
-                          np.arange(viewer.layers[main_label_name].data.shape[2]),
+    label_shape = viewer.layers[main_label_name].data.shape
+    z, y, x = np.meshgrid(np.arange(label_shape[0]),
+                          np.arange(label_shape[1]),
+                          np.arange(label_shape[2]),
                           indexing='ij')
 
     # Calculate the distance of each voxel from the plane
-    distances = (x - position[2]) * normal[2] + (y - position[1]) * normal[1] + (z - position[0]) * normal[0]
+    distances = (x - adjusted_position[2]) * normal[2] + \
+                (y - adjusted_position[1]) * normal[1] + \
+                (z - adjusted_position[0]) * normal[0]
 
     # Update main_label_name layer from label_3d_name layer if it exists
     update_label_from_3d_edit_layer(viewer)
@@ -746,12 +758,10 @@ def shift_data_right_fast_and_recut_3d_label(viewer):
 def move_left(viewer, distance=1):
     # viewer.window._qt_viewer.viewer.dims._increment_dims_left()
     shift_plane(viewer.layers[data_name], -distance)
-    QApplication.processEvents()
 
 def move_right(viewer, distance=1):
     # viewer.window._qt_viewer.viewer.dims._increment_dims_right()
     shift_plane(viewer.layers[data_name], distance)
-    QApplication.processEvents()
 
 # Create timers for holding keys
 left_timer = QTimer()
@@ -877,6 +887,45 @@ def connected_components(viewer, preview=False, cc_layer_name=main_label_name):
         show_popup(msg)
     viewer.status = msg
     print(msg)
+
+def toggle_contextual_view(viewer):
+    global pad_state, prev_erase_plane_info_var
+
+    # Define the translation offset
+    offset = np.array([pad_amount, pad_amount, pad_amount])
+
+    if pad_state:
+        # Remove the offset
+        for layer in viewer.layers:
+            if layer.name != data_name:
+                layer.translate -= offset
+        
+        # Reset the data layer to the original (unpadded) data
+        viewer.layers[data_name].data = raw_data
+        shift_plane(viewer.layers[data_name], 0, padding_mode=True, padding=-pad_amount)
+        # Adjust the camera position
+        viewer.camera.center -= offset
+        # Adjust prev_erase_plane_info_var
+        if prev_erase_plane_info_var is not None:
+            prev_erase_plane_info_var['position'] -= offset
+
+        pad_state = False
+    else:
+        # Add the offset
+        for layer in viewer.layers:
+            if layer.name != data_name:
+                layer.translate += offset
+        
+        # Set the data layer to the padded data
+        viewer.layers[data_name].data = padded_raw_data
+        shift_plane(viewer.layers[data_name], 0, padding_mode=True, padding=pad_amount)
+        # Adjust the camera position
+        viewer.camera.center += offset
+        # Adjust prev_erase_plane_info_var
+        if prev_erase_plane_info_var is not None:
+            prev_erase_plane_info_var['position'] += offset
+
+        pad_state = True
 
 def add_padding_contextual_data(viewer):
     global pad_state, previous_label_3d_data, manual_changes_mask
@@ -1103,14 +1152,14 @@ set_camera_view(viewer)
 setup_brush_size_listener(viewer, main_label_name)
 
 # Add the threedee plugin dock widgets if using ink prediction data
-if ink_pred_data is not None:
-    viewer.window.add_plugin_dock_widget(
-        plugin_name="napari-threedee", widget_name="render plane manipulator"
-    )
+# if ink_pred_data is not None:
+viewer.window.add_plugin_dock_widget(
+    plugin_name="napari-threedee", widget_name="render plane manipulator"
+)
 
-    viewer.window.add_plugin_dock_widget(
-        "napari-threedee", widget_name="label annotator"
-    )
+viewer.window.add_plugin_dock_widget(
+    "napari-threedee", widget_name="label annotator"
+)
 
 app = QApplication([])
 loop = QEventLoop(app)
