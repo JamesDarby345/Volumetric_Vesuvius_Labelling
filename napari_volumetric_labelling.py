@@ -34,7 +34,9 @@ def read_config(config_path='napari_config.yaml'):
             return config.get('cube_info',{}), config.get('customizable_hotkeys', {})
     return {}
 
-config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
+# config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
+config_path = 'ink_det_config.yaml' if os.path.exists('ink_det_config.yaml') else 'napari_config.yaml'
+
 cube_info, hotkey_config = read_config(config_path)
 
 # Data location and size parameters
@@ -68,6 +70,8 @@ chunk_size = cube_info.get('chunk_size', 256)
 pad_amount = cube_info.get('pad_amount', 100)
 brush_size = cube_info.get('brush_size', 4)
 author = cube_info.get('author', '-')
+
+main_label_layer_name = cube_info.get('main_label_layer_name', 'papyrus')
 
 raw_data_axis_order = cube_info.get('raw_data_axis_order', 'zyx') #assumes zyx if not set
 ink_pred_label_axis_order = cube_info.get('ink_pred_label_axis_order', None)
@@ -192,7 +196,7 @@ ink_pred_data = original_ink_pred_data
 viewer = napari.Viewer()
 
 #layer name variables
-label_name = 'Papyrus Labels'
+papyrus_label_name = 'Papyrus Labels'
 ink_label_name = 'Ink Labels'
 data_name = 'Data'
 ff_name = 'Flood Fill'
@@ -208,15 +212,22 @@ erase_mode = False
 global erase_slice_width
 erase_slice_width = 30
 
+if main_label_layer_name != 'ink':
+    main_label_name = papyrus_label_name
+else: 
+    main_label_name = ink_label_name
+
 # Add the 3D data to the viewer
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
-labels_layer = viewer.add_labels(label_data, name=label_name)
+papyrus_label_layer = viewer.add_labels(label_data, name=papyrus_label_name)
 if ink_pred_data is not None:
     ink_labels_layer = viewer.add_labels(ink_pred_data, name=ink_label_name)
 
 def align_plane_with_selected_label(viewer):
-    if ink_pred_data is None or (not viewer.layers[ink_label_name].visible and viewer.layers[label_name].visible):
-        align_layer = viewer.layers[label_name]
+    if viewer.layers[main_label_name].visible:
+        align_layer = viewer.layers[main_label_name]
+    elif ink_pred_data is None or (not viewer.layers[ink_label_name].visible and viewer.layers[papyrus_label_name].visible):
+        align_layer = viewer.layers[papyrus_label_name]
     else:
         align_layer = viewer.layers[ink_label_name]
     data_layer = viewer.layers[data_name]
@@ -241,8 +252,8 @@ def align_plane_with_selected_label(viewer):
 def pan_with_middle_mouse(viewer, event):
     if event.button == 3 or event.button == 2 or (event.button == 1 and keys.SHIFT in event.modifiers):  # Middle mouse button or right click
         if viewer.layers.selection.active is None:
-            viewer.layers.selection.active = viewer.layers[label_name]
-            viewer.layers[label_name].mode = 'pan_zoom'
+            viewer.layers.selection.active = viewer.layers[main_label_name]
+            viewer.layers[main_label_name].mode = 'pan_zoom'
         original_mode = viewer.layers.selection.active.mode
         viewer.layers.selection.active.mode = 'pan_zoom'
         yield
@@ -265,8 +276,8 @@ def update_global_brush_size(event):
     apply_global_brush_size(viewer, source_layer=event.source)
 
 def setup_brush_size_listener(viewer, layer_name):
-    labels_layer = viewer.layers[layer_name]
-    labels_layer.events.brush_size.connect(update_global_brush_size)
+    brush_layer = viewer.layers[layer_name]
+    brush_layer.events.brush_size.connect(update_global_brush_size)
 
 def switch_to_data_layer(viewer):
     viewer.layers[data_name].visible = True
@@ -279,7 +290,7 @@ def toggle_labels_visibility(viewer):
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers:
         viewer.layers[label_3d_name].visible = not viewer.layers[label_3d_name].visible
     else:
-        labels_layer.visible = not labels_layer.visible
+        viewer.layers[main_label_name].visible = not viewer.layers[main_label_name].visible
 
 def toggle_data_visibility(viewer):
     msg = 'toggle data visibility'
@@ -307,7 +318,7 @@ def toggle_show_selected_label(viewer):
     msg = 'toggle show selected label'
     viewer.status = msg
     print(msg)
-    labels_layer.show_selected_label = not labels_layer.show_selected_label
+    viewer.layers[main_label_name].show_selected_label = not viewer.layers[main_label_name].show_selected_label
     if label_3d_name in viewer.layers:
         viewer.layers[label_3d_name].show_selected_label = not viewer.layers[label_3d_name].show_selected_label
 
@@ -323,10 +334,10 @@ def flood_fill(viewer, distance=20):
     cursor_position = tuple(int(np.round(coord)) for coord in cursor_position)
 
     # Get the current labels layer
-    labels_layer = viewer.layers[label_name]
+    papyrus_label_layer = viewer.layers[papyrus_label_name]
 
     # Get the current labels
-    labels = labels_layer.data
+    labels = papyrus_label_layer.data
 
     # Perform the flood fill operation
     flood_fill_result = limited_bfs_flood_fill(labels, cursor_position, distance)
@@ -429,7 +440,7 @@ def erode_dilate_labels(viewer, data, erode=True, erosion_iterations=1, dilation
         show_info(f"Processing: {progress:.0%}")
     
     def on_complete(result):
-        viewer.layers[label_name].data = result
+        viewer.layers[main_label_name].data = result
         show_info("Processing complete!")
     
     worker.yielded.connect(update_progress)
@@ -474,7 +485,7 @@ def reset_plane_view_to_default(viewer):
         if label_3d_name in viewer.layers:
             update_label_from_3d_edit_layer(viewer)
             viewer.layers.remove(viewer.layers[label_3d_name])
-        viewer.layers[label_name].visible = True
+        viewer.layers[main_label_name].visible = True
 
 def shift_plane(layer, direction, padding_mode=False, padding=50):
     global plane_shift_status
@@ -517,7 +528,7 @@ def full_label_view(viewer):
     if viewer.dims.ndisplay == 2:
         viewer.dims.ndisplay = 3
         for layer in viewer.layers:
-            if layer.name != label_name:
+            if layer.name != main_label_name:
                 viewer.layers[layer.name].visible = False
             else:
                 viewer.layers[layer.name].visible = True
@@ -532,10 +543,10 @@ def full_label_view(viewer):
                 viewer.layers[layer.name].visible = True
             else:
                 viewer.layers[layer.name].visible = False
-            if layer.name == label_name:
+            if layer.name == ink_label_name or layer.name == papyrus_label_name or layer.name == ff_name:
                 viewer.layers[layer.name].blending = 'translucent'
-        viewer.layers.selection.active = viewer.layers[label_name]
-        viewer.layers[label_name].contour = 1
+        viewer.layers.selection.active = viewer.layers[main_label_name]
+        viewer.layers[main_label_name].contour = 1
             
 def switch_to_plane_view(viewer):
     global prev_camera_pos
@@ -546,14 +557,14 @@ def switch_to_plane_view(viewer):
         prev_camera_pos = get_current_camera_info(viewer)
         viewer.dims.ndisplay = 2
         for layer in viewer.layers:
-            if layer.name != label_3d_name and layer.name != cc_preview_name:
-                viewer.layers[layer.name].visible = True
-            else:
+            if layer.name == label_3d_name or layer.name == cc_preview_name:
                 viewer.layers[layer.name].visible = False
-            if layer.name == label_name:
+            else:
+                viewer.layers[layer.name].visible = True
+            if layer.name == main_label_name:
                 viewer.layers[layer.name].blending = 'translucent'
-        viewer.layers.selection.active = viewer.layers[label_name]
-        viewer.layers[label_name].contour = 1
+        viewer.layers.selection.active = viewer.layers[main_label_name]
+        viewer.layers[main_label_name].contour = 1
 
     else:
         # Switch to 3D mode
@@ -563,9 +574,9 @@ def switch_to_plane_view(viewer):
         # Prep layers visibility and blending
         for layer in viewer.layers:
             
-            if layer.name != data_name and layer.name != ff_name and layer.name != label_name and layer.name != label_3d_name:
+            if layer.name != data_name and layer.name != ff_name and layer.name != main_label_name and layer.name != label_3d_name:
                 viewer.layers[layer.name].visible = False
-            elif layer.name == label_name:
+            elif layer.name == main_label_name:
                 if label_3d_name in viewer.layers:
                     viewer.layers[label_3d_name].visible = True
                     viewer.layers[label_3d_name].blending = 'opaque'
@@ -587,9 +598,8 @@ def switch_to_plane_view(viewer):
 def update_label_from_3d_edit_layer(viewer):
     global previous_label_3d_data, manual_changes_mask
 
-    if label_3d_name in viewer.layers and label_name in viewer.layers:
+    if label_3d_name in viewer.layers and main_label_name in viewer.layers:
         existing_layer = viewer.layers[label_3d_name]
-        labels_layer = viewer.layers[label_name]
 
         if isinstance(existing_layer, napari.layers.Labels):
             # Calculate the manual changes mask
@@ -599,10 +609,10 @@ def update_label_from_3d_edit_layer(viewer):
                 manual_changes_mask = np.zeros_like(existing_layer.data, dtype=bool)
             
             # Apply the manual changes to the label_name layer
-            labels_layer.data[manual_changes_mask] = existing_layer.data[manual_changes_mask]
+            viewer.layers[main_label_name].data[manual_changes_mask] = existing_layer.data[manual_changes_mask]
             
             # Refresh the viewer to immediately show the changes
-            labels_layer.refresh()
+            viewer.layers[main_label_name].refresh()
 
 def setup_label_3d_layer(viewer, new_label_data, active_mode):
     global brush_size
@@ -655,20 +665,19 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     viewer.layers[data_name].blending = 'opaque'
 
     # Create a meshgrid for the label data coordinates
-    z, y, x = np.meshgrid(np.arange(viewer.layers[label_name].data.shape[0]),
-                          np.arange(viewer.layers[label_name].data.shape[1]),
-                          np.arange(viewer.layers[label_name].data.shape[2]),
+    z, y, x = np.meshgrid(np.arange(viewer.layers[main_label_name].data.shape[0]),
+                          np.arange(viewer.layers[main_label_name].data.shape[1]),
+                          np.arange(viewer.layers[main_label_name].data.shape[2]),
                           indexing='ij')
 
     # Calculate the distance of each voxel from the plane
     distances = (x - position[2]) * normal[2] + (y - position[1]) * normal[1] + (z - position[0]) * normal[0]
-    labels_layer = viewer.layers[label_name]
 
-    # Update label_name layer from label_3d_name layer if it exists
+    # Update main_label_name layer from label_3d_name layer if it exists
     update_label_from_3d_edit_layer(viewer)
 
     # Create a copy of the label data and set all voxels between the viewer and the plane to 0
-    new_label_data = labels_layer.data.copy()
+    new_label_data = viewer.layers[main_label_name].data.copy()
     if cut_side:
         new_label_data[distances > -2.5] = 0
         if erase_mode:
@@ -782,11 +791,11 @@ def erase_mode_toggle(viewer):
         viewer.layers[label_3d_name].mode = 'erase'
         viewer.layers.selection.active = viewer.layers[label_3d_name]
     elif viewer.dims.ndisplay == 3:
-        viewer.layers[label_name].mode = 'erase'
-        viewer.layers.selection.active = viewer.layers[label_name]
+        viewer.layers[main_label_name].mode = 'erase'
+        viewer.layers.selection.active = viewer.layers[main_label_name]
     elif viewer.dims.ndisplay == 2:
-        viewer.layers[label_name].mode = 'erase'
-        viewer.layers.selection.active = viewer.layers[label_name]
+        viewer.layers[main_label_name].mode = 'erase'
+        viewer.layers.selection.active = viewer.layers[main_label_name]
 
 def plane_erase_3d_mode(viewer, switch=True):
     global erase_mode, cut_side, plane_shift_status, prev_erase_plane_info_var
@@ -800,13 +809,13 @@ def plane_erase_3d_mode(viewer, switch=True):
         normal = np.array(viewer.layers[data_name].plane.normal)
         prev_erase_plane_info_var = {'position': position, 'normal': normal}
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side)
-        viewer.layers[label_name].visible = False
+        viewer.layers[main_label_name].visible = False
 
 def move_mode(viewer):
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         viewer.layers[label_3d_name].mode = 'pan_zoom'
     else:
-        viewer.layers[label_name].mode = 'pan_zoom'
+        viewer.layers[main_label_name].mode = 'pan_zoom'
 
 def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
     global erase_mode, cut_side, plane_shift_status
@@ -818,13 +827,13 @@ def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
     if viewer.dims.ndisplay == 3 and viewer.layers[data_name].depiction == 'plane' and viewer.layers[data_name].visible:
         cut_label_at_plane(viewer, erase_mode=False, cut_side=cut_side, prev_plane_info=prev_plane_info)
         viewer.layers[label_3d_name].visible = True
-        viewer.layers[label_name].visible = False
+        viewer.layers[main_label_name].visible = False
 
-def connected_components(viewer, preview=False, cc_layer_name=label_name):
+def connected_components(viewer, preview=False, cc_layer_name=main_label_name):
     global erase_mode, cut_side
 
-    if not preview and labels_layer.data is not None and ink_pred_data is not None:
-        cc_layer_name = select_from_list_popup("Connected Components", "Select the layer to apply connected components to", [label_name, ink_label_name])
+    if not preview and viewer.layers[main_label_name].data is not None and ink_pred_data is not None:
+        cc_layer_name = select_from_list_popup("Connected Components", "Select the layer to apply connected components to", [papyrus_label_name, ink_label_name])
     if not preview:
         msg = "DANGER Are you sure you want to run connected components? This operation cannot be undone and removes the undo queue. Consider saving first. \n\nIF YOU HAVE DILATED SEPERATED LABELS AND THEY NOW TOUCH, THEY WILL BE COMBINED."
         response = confirm_popup(msg)
@@ -852,7 +861,7 @@ def connected_components(viewer, preview=False, cc_layer_name=label_name):
         viewer.layers[cc_preview_name].visible = True
         viewer.layers[cc_preview_name].colormap = get_direct_label_colormap()
         viewer.layers[cc_preview_name].editable = False
-        viewer.layers[label_name].visible = False
+        viewer.layers[main_label_name].visible = False
         if label_3d_name in viewer.layers:
             viewer.layers[label_3d_name].visible = False
     else:
@@ -920,8 +929,8 @@ def erode_labels(viewer):
         if response != QMessageBox.Yes:
             print('eroding labels cancelled')
             return 
-        erode_dilate_labels(viewer, labels_layer.data)
-        labels_layer.refresh()
+        erode_dilate_labels(viewer, viewer.layers[main_label_name].data)
+        viewer.layers[main_label_name].refresh()
 
         #update 3d label layer if it is visible
         if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
@@ -947,8 +956,8 @@ def dilate_labels(viewer):
         if response != QMessageBox.Yes:
             print('dilating labels cancelled')
             return 
-        erode_dilate_labels(viewer, labels_layer.data, erode=False)
-        labels_layer.refresh()
+        erode_dilate_labels(viewer, viewer.layers[main_label_name].data, erode=False)
+        viewer.layers[main_label_name].refresh()
 
         #update 3d label layer if it is visible
         if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
@@ -967,7 +976,7 @@ def save_labels(viewer):
     msg = 'save labels'
     viewer.status = msg
     print(msg)
-    if viewer.layers[label_name].data.shape[0] != chunk_size:
+    if viewer.layers[main_label_name].data.shape[0] != chunk_size:
         msg = "please remove addtional context padding before saving"
         show_popup(msg)
         return
@@ -976,18 +985,18 @@ def save_labels(viewer):
     output_path = os.path.join(current_directory, file_path)
     if not os.path.exists(output_path):
         os.makedirs(output_path)
-    print(labels_layer.data.shape, labels_layer.data.dtype)
+    print(papyrus_label_layer.data.shape, papyrus_label_layer.data.dtype)
     if label_3d_name in viewer.layers:
         update_label_from_3d_edit_layer(viewer)
     if ink_pred_data is not None:
         nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_ink_label.nrrd"), ink_labels_layer.data)
-    if labels_layer.data is not None:
+    if papyrus_label_layer.data is not None:
         if label_header is not None:
             label_header['saved_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             save_header = dict(label_header)
-            nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), labels_layer.data, header=save_header)
+            nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), papyrus_label_layer.data, header=save_header)
         else: 
-            nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), labels_layer.data)
+            nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), papyrus_label_layer.data)
     nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_raw.nrrd"), viewer.layers[data_name].data)
     msg = f"Layers saved to {output_path}"
     show_popup(msg)
@@ -998,7 +1007,7 @@ def connected_components_preview(viewer):
         if label_3d_name in viewer.layers:
             viewer.layers[label_3d_name].visible = True
         else:
-            viewer.layers[label_name].visible = True
+            viewer.layers[main_label_name].visible = True
     else:
         connected_components(viewer, preview=True)
     
@@ -1053,12 +1062,12 @@ def update_global_erase_slice_width(value):
     print(f"Global erase width updated to: {erase_slice_width}")
 
 # Create the GUI
-gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotkey_config)
-gui.setup_napari_defaults()
+gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotkey_config, main_label_name)
+gui.setup_napari_defaults(main_label_name)
 
 bind_hotkeys(viewer, hotkey_config)
 set_camera_view(viewer)
-setup_brush_size_listener(viewer, label_name)
+setup_brush_size_listener(viewer, main_label_name)
 
 # Add the threedee plugin dock widgets if using ink prediction data
 if ink_pred_data is not None:
