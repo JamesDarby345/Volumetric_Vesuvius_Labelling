@@ -24,6 +24,10 @@ from napari_threedee.manipulators._qt import QtRenderPlaneManipulatorWidget
 from PyQt5.QtWidgets import QDockWidget, QApplication
 from PyQt5.QtCore import Qt
 
+import asyncio
+from qasync import QEventLoop, QApplication
+from concurrent.futures import ThreadPoolExecutor
+
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
 
 def read_config(config_path='napari_config.yaml'):
@@ -971,34 +975,63 @@ def dilate_labels(viewer):
     viewer.status = msg
     print(msg)
 
-def save_labels(viewer):
+async def save_nrrd_async(file_path, data, header=None):
+    def save_task():
+        nrrd.write(file_path, data, header=header)
+        print(f"Saved: {file_path}")
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, save_task)
+
+async def save_labels_async(viewer):
     msg = 'save labels'
     viewer.status = msg
     print(msg)
+
     if viewer.layers[main_label_name].data.shape[0] != chunk_size:
-        msg = "please remove addtional context padding before saving"
+        msg = "please remove additional context padding before saving"
         show_popup(msg)
         return
+
     current_directory = os.getcwd()
-    file_path = os.path.join('output',f'volumetric_labels_{scroll_name}',f'{z}_{y}_{x}')
+    file_path = os.path.join('output', f'volumetric_labels_{scroll_name}', f'{z}_{y}_{x}')
     output_path = os.path.join(current_directory, file_path)
     if not os.path.exists(output_path):
         os.makedirs(output_path)
+
     print(papyrus_label_layer.data.shape, papyrus_label_layer.data.dtype)
+
     if label_3d_name in viewer.layers:
         update_label_from_3d_edit_layer(viewer)
+
+    tasks = []
+
     if ink_pred_data is not None:
-        nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_ink_label.nrrd"), ink_labels_layer.data)
+        ink_file = os.path.join(output_path, f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_ink_label.nrrd")
+        tasks.append(save_nrrd_async(ink_file, ink_labels_layer.data))
+
     if papyrus_label_layer.data is not None:
+        papyrus_file = os.path.join(output_path, f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
         if label_header is not None:
             label_header['saved_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             save_header = dict(label_header)
-            nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), papyrus_label_layer.data, header=save_header)
-        else: 
-            nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd"), papyrus_label_layer.data)
-    nrrd.write(os.path.join(output_path,f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_raw.nrrd"), viewer.layers[data_name].data)
+            tasks.append(save_nrrd_async(papyrus_file, papyrus_label_layer.data, header=save_header))
+        else:
+            tasks.append(save_nrrd_async(papyrus_file, papyrus_label_layer.data))
+
+    raw_data_output_file = os.path.join(output_path, f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_raw.nrrd")
+    if not os.path.exists(raw_data_output_file):
+        tasks.append(save_nrrd_async(raw_data_output_file, viewer.layers[data_name].data))
+
+    await asyncio.gather(*tasks)
+
     msg = f"Layers saved to {output_path}"
     show_popup(msg)
+
+def save_labels(viewer, should_show_popup=True):
+    asyncio.ensure_future(save_labels_async(viewer))
+    if should_show_popup:
+        show_popup("Saving has started. You will be notified when it's complete.")
 
 def connected_components_preview(viewer):
     if cc_preview_name in viewer.layers and viewer.layers[cc_preview_name].visible:
@@ -1079,5 +1112,11 @@ if ink_pred_data is not None:
         "napari-threedee", widget_name="label annotator"
     )
 
+app = QApplication([])
+loop = QEventLoop(app)
+asyncio.set_event_loop(loop)
 # Start the Napari event loop
 napari.run()
+
+with loop:
+    loop.run_forever()

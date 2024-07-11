@@ -10,3 +10,4 @@ jupyter
 ipykernel
 napari-threedee
 scikit-learn
+qasync
