@@ -49,13 +49,14 @@ class CustomButtonWidget(QWidget):
         self.setLayout(layout)
 
 class VesuviusGUI:
-    def __init__(self, viewer, functions_dict, update_global_erase_slice_width, config):
+    def __init__(self, viewer, functions_dict, update_global_erase_slice_width, config, main_label_layer_name='Papyrus Labels'):
         self.viewer = viewer
         self.functions = functions_dict  # Store the functions dictionary
         self.update_global_erase_slice_width = update_global_erase_slice_width
         self.erase_slice_width = 30
         self.config = config
         self.setup_gui()
+        self.main_label_layer_name = main_label_layer_name
 
     def get_key_string(self, func):
         keys = self.config.get(func, [])
@@ -155,7 +156,7 @@ class VesuviusGUI:
         self.update_global_erase_slice_width(value)
         print(f"Erase width updated to: {self.erase_slice_width}")
 
-    def setup_napari_defaults(self):
+    def setup_napari_defaults(self, main_label_layer_name='Papyrus Labels'):
         viewer = self.viewer
         label_name = 'Papyrus Labels'
         ink_label_name = 'Ink Labels'
@@ -164,23 +165,24 @@ class VesuviusGUI:
         label_3d_name = '3D Label Edit Layer'
         self.viewer.axes.visible = True
         self.viewer.dims.ndisplay = 3   
-        labels_layer = self.viewer.layers[label_name]
-        labels_layer.n_edit_dimensions = 3
-        labels_layer.opacity = 1
-        labels_layer.contour = 1
-        labels_layer.brush_size = 4
+        main_label_layer = self.viewer.layers[main_label_layer_name]
+        main_label_layer.n_edit_dimensions = 3
+        main_label_layer.opacity = 1
+        main_label_layer.contour = 1
+        main_label_layer.brush_size = 4
         self.viewer.theme = 'light'
         self.viewer.window._qt_viewer.canvas.bgcolor = (0.68, 0.85, 0.90, 1.0)
-        labels_layer.colormap = get_direct_label_colormap()
-        labels_layer.shape = 'square'
-        self.viewer.layers.selection.active = labels_layer
+        main_label_layer.colormap = get_direct_label_colormap()
+        main_label_layer.shape = 'square'
+        self.viewer.layers.selection.active = main_label_layer
         # Prep layers visibility and blending
         step_val = viewer.dims.current_step
         for layer in viewer.layers:
             
-            if layer.name != data_name and layer.name != ff_name and layer.name != label_name and layer.name != label_3d_name:
+            if layer.name != data_name and layer.name != ff_name and layer.name != main_label_layer_name and layer.name != label_3d_name:
                 viewer.layers[layer.name].visible = False
-            elif layer.name == label_name:
+                viewer.layers[layer.name].blending = 'opaque'
+            elif layer.name == main_label_layer_name:
                 if label_3d_name in viewer.layers:
                     viewer.layers[label_3d_name].visible = True
                     viewer.layers[label_3d_name].blending = 'opaque'
