@@ -49,7 +49,7 @@ customizable_hotkeys:
   cut_label_at_oblique_plane: ["Shift-v","k"]
   switch_to_plane_view: ["Shift-c","g"]
   full_label_view: "v"
-  add_padding_contextual_data: "t"
+  toggle_contextual_view: "t"
   connected_components_preview: "r"
 
   #l is defaulted for switching to data layer because it is near o

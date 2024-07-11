@@ -927,49 +927,6 @@ def toggle_contextual_view(viewer):
 
         pad_state = True
 
-def add_padding_contextual_data(viewer):
-    global pad_state, previous_label_3d_data, manual_changes_mask
-    if padded_raw_data.shape == raw_data.shape:
-        print("No padding available")
-        return
-    if pad_state:
-        data = raw_data
-        viewer.layers[data_name].data = data
-        
-        # Remove padding from the layers
-        slices = tuple(slice(pad_amount, -pad_amount) if dim > 2 * pad_amount else slice(None) for dim in data.shape)
-        for layer in viewer.layers:
-            if layer.name is not data_name:
-                original_data = layer.data.copy()
-                layer.data = original_data[slices]
-        if previous_label_3d_data is not None:
-            previous_label_3d_data = previous_label_3d_data[slices]
-        if manual_changes_mask is not None:
-            manual_changes_mask = manual_changes_mask[slices]
-        shift_plane(viewer.layers[data_name], 0, padding_mode=True, padding=-pad_amount)
-        viewer.camera.center = (viewer.camera.center[0] - pad_amount, viewer.camera.center[1] - pad_amount, viewer.camera.center[2] - pad_amount)
-        pad_state = False
-    else:
-        data = padded_raw_data
-        viewer.layers[data_name].data = data
-        # if label_3d_name in viewer.layers:
-        #     viewer.layers.remove(viewer.layers[label_3d_name])
-
-        # Add padding to the layers
-        pad_width = ((pad_amount, pad_amount), (pad_amount, pad_amount), (pad_amount, pad_amount))
-        for layer in viewer.layers:
-            if layer.name is not data_name:
-                print(layer.name)
-                original_data = layer.data.copy()
-                layer.data = np.pad(original_data, pad_width=pad_width, mode='constant', constant_values=0)
-        if previous_label_3d_data is not None:
-            previous_label_3d_data = np.pad(previous_label_3d_data, pad_width=pad_width, mode='constant', constant_values=0)
-        if manual_changes_mask is not None:
-            manual_changes_mask = np.pad(manual_changes_mask, pad_width=pad_width, mode='constant', constant_values=0)
-        shift_plane(viewer.layers[data_name], 0, padding_mode=True, padding=pad_amount)
-        viewer.camera.center = (viewer.camera.center[0] + pad_amount, viewer.camera.center[1] + pad_amount, viewer.camera.center[2] + pad_amount)
-        pad_state = True
-
 def erode_labels(viewer):
     global pad_state
     msg = 'eroding labels'
