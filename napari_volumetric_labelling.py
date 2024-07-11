@@ -35,7 +35,6 @@ def read_config(config_path='napari_config.yaml'):
     return {}
 
 config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
-# config_path = 'ink_det_config.yaml' if os.path.exists('ink_det_config.yaml') else 'napari_config.yaml'
 cube_info, hotkey_config = read_config(config_path)
 
 # Data location and size parameters
