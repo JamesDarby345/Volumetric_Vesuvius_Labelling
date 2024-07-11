@@ -1088,7 +1088,7 @@ functions_dict = {
     'dilate_labels': dilate_labels,
     'full_label_view': full_label_view,
     'switch_to_plane': switch_to_plane_view,
-    'add_padding_contextual_data': add_padding_contextual_data,
+    'toggle_contextual_view': toggle_contextual_view,
     'cut_label_at_oblique_plane': cut_label_at_oblique_plane,
     'connected_components': connected_components,
     'save_labels': save_labels,

@@ -126,7 +126,7 @@ class VesuviusGUI:
         self.erode_button = CustomButtonWidget("Erode Labels", self.get_key_string('erode_labels'), self.erode_labels_gui)
         self.full_view_button = CustomButtonWidget("Toggle Full Label View", self.get_key_string('full_label_view'), self.toggle_full_label_view)
         self.plane_cut_button = CustomButtonWidget("Toggle 3D Plane Cut View", self.get_key_string('switch_to_plane_view'), self.toggle_3D_plane_cut_view)
-        self.padding_button = CustomButtonWidget("Toggle Padding Context", self.get_key_string('add_padding_contextual_data'), self.toggle_padding_context)
+        self.padding_button = CustomButtonWidget("Toggle Padding Context", self.get_key_string('toggle_contextual_view'), self.toggle_padding_context)
         self.cut_plane_button = CustomButtonWidget("Cut Label at Plane", self.get_key_string('cut_label_at_oblique_plane'), self.cut_label_at_plane_gui)
         self.components_button = CustomButtonWidget("Connected Components", self.get_key_string('connected_components'), self.run_connected_components)
         self.save_button = CustomButtonWidget("Save Labels", self.get_key_string('save_labels'), self.save_labels_button)
@@ -158,8 +158,6 @@ class VesuviusGUI:
 
     def setup_napari_defaults(self, main_label_layer_name='Papyrus Labels'):
         viewer = self.viewer
-        label_name = 'Papyrus Labels'
-        ink_label_name = 'Ink Labels'
         data_name = 'Data'
         ff_name = 'flood_fill_layer'
         label_3d_name = '3D Label Edit Layer'
@@ -212,7 +210,7 @@ class VesuviusGUI:
         self.functions['switch_to_plane_view'](self.viewer)
 
     def toggle_padding_context(self):
-        self.functions['add_padding_contextual_data'](self.viewer)
+        self.functions['toggle_contextual_view'](self.viewer)
 
     def cut_label_at_plane_gui(self):
         self.functions['cut_label_at_oblique_plane'](self.viewer)
