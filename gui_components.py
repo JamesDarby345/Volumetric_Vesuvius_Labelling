@@ -51,18 +51,21 @@ class CustomButtonWidget(QWidget):
 class VesuviusGUI:
     def __init__(self, viewer, functions_dict, update_global_erase_slice_width, config, main_label_layer_name='Papyrus Labels'):
         self.viewer = viewer
-        self.functions = functions_dict  # Store the functions dictionary
+        self.functions = functions_dict
         self.update_global_erase_slice_width = update_global_erase_slice_width
         self.erase_slice_width = 30
         self.config = config
-        self.setup_gui()
         self.main_label_layer_name = main_label_layer_name
+        self.setup_gui()
 
     def get_key_string(self, func):
-        keys = self.config.get(func, [])
+        if not hasattr(self.config.hotkey_config, func):
+            print(f'Function {func} not found in hotkey config')
+            return ''
+        keys = getattr(self.config.hotkey_config, func)
         if isinstance(keys, list):
-            return ' or '.join(keys)
-        return str(keys)
+            return ' or '.join(str(key) for key in keys if key)
+        return str(keys) if keys else ''
 
     def create_button_container(self):
         container = QWidget()
@@ -111,7 +114,7 @@ class VesuviusGUI:
         text_container = QWidget()
         text_layout = QVBoxLayout()
         text_container.setLayout(text_layout)
-        instruction_label = QLabel(self.get_instruction_text(self.config))
+        instruction_label = QLabel(self.get_instruction_text())
         instruction_label.setWordWrap(True)
         instruction_label.setAlignment(Qt.AlignmentFlag.AlignTop)
         text_layout.addWidget(instruction_label)
@@ -221,7 +224,7 @@ class VesuviusGUI:
     def save_labels_button(self):
         self.functions['save_labels'](self.viewer)
 
-    def get_instruction_text(self, config):
+    def get_instruction_text(self):
         def key_to_string(key):
             key_map = {
                 'Left': 'Left Arrow',
@@ -235,25 +238,15 @@ class VesuviusGUI:
             }
             return key_map.get(key, key)
 
-        # Create a reverse mapping of function to keys
-        function_to_keys = {}
-        for func, keys in config.items():
-            if isinstance(keys, list):
-                for key in keys:
-                    if func not in function_to_keys:
-                        function_to_keys[func] = []
-                    function_to_keys[func].append(key)
-            else:
-                if func not in function_to_keys:
-                    function_to_keys[func] = []
-                function_to_keys[func].append(keys)
-
-        # Function to get a string of keys for a function
         def get_key_string(func):
-            keys = function_to_keys.get(func, [])
-            if not keys or keys == ['']:
+            if not hasattr(self.config.hotkey_config, func):
                 return 'unassigned'
-            return ' or '.join(f'<b>{key_to_string(key)}</b>' for key in keys if key)
+            keys = getattr(self.config.hotkey_config, func)
+            if not keys:
+                return 'unassigned'
+            if isinstance(keys, list):
+                return ' or '.join(f'<b>{key_to_string(key)}</b>' for key in keys if key)
+            return f'<b>{key_to_string(keys)}</b>'
 
         instruction_text = f"""
         <b>Custom Napari Keybinds:</b><br>
@@ -264,23 +257,20 @@ class VesuviusGUI:
         - {get_key_string('switch_to_data_layer')} to switch active layer to data layer<br>
         - {get_key_string('full_label_view')} to toggle full 3D label view<br>
         - {get_key_string('switch_to_plane_view')} to toggle 3D plane cut view layers<br>
-        - {get_key_string('erase_3d_mode')} to switch to erase mode<br>
+        - {get_key_string('erase_mode_toggle')} to switch to erase mode<br>
         - {get_key_string('move_mode')} to switch to pan & zoom mode<br>
         - {get_key_string('plane_erase_3d_mode')} to toggle 3D plane precision erase mode<br>
         - <b>shift + click</b> to move the 3D volume plane quickly<br>
         - <b>shift + right click + drag up or down</b> to 'fisheye' the view<br>\n
         - {get_key_string('erode_labels')} to erode labels 1 iteration<br>
         - {get_key_string('dilate_labels')} to dilate labels 1 iteration<br>
-        - {get_key_string('add_padding_contextual_data')} to toggle context padding data<br>
+        - {get_key_string('toggle_contextual_view')} to toggle context padding data<br>
         - {get_key_string('connected_components')} to run connected components analysis and relabel<br>
         - {get_key_string('flood_fill')} for standard flood fill<br>
         - {get_key_string('large_flood_fill')} for larger flood fill<br>
         - {get_key_string('save_labels')} to save data & labels as nrrd files<br>\n
-        - {get_key_string('draw_compressed_class')} to toggle compressed region class brush<br>
-        - {get_key_string('decrease_brush_size')} to decrease brush size<br>
-        - {get_key_string('increase_brush_size')} to increase brush size<br>
-        - {get_key_string('label_picker')} to select label layer under cursor<br>
+        - {get_key_string('decrease_brush_size')} or '[' to decrease brush size<br>
+        - {get_key_string('increase_brush_size')} or ']' to increase brush size<br>
         - {get_key_string('toggle_show_selected_label')} to toggle show selected label<br>
-        - {get_key_string('interpolate_borders')} to extrapolate sparse compressed class labels<br>
         """
         return instruction_text

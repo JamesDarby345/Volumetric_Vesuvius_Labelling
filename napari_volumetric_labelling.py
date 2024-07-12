@@ -20,167 +20,53 @@ from datetime import datetime
 from collections import defaultdict
 import asyncio
 from qasync import QEventLoop, QApplication
-
+from data_manager import DataManager
+from config import Config  # Assuming you create a Config class
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
 
 config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
 
-cube_info, hotkey_config = read_config(config_path)
+config = Config(config_path)
+
+
+data_manager = DataManager(config.cube_config)
 
 # Data location and size parameters
-scroll_name = cube_info.get('scroll_name', "")
-papyrus_mask_factor = cube_info.get('factor', 1.0)
-zyx = cube_info.get('zyx', None)
-if not zyx:
-    z = cube_info.get('z', '02000')
-    y = cube_info.get('y', '02000')
-    x = cube_info.get('x', '02000')
-    z_num = int(z)
-    y_num = int(y)
-    x_num = int(x)
-else:
-    z, y, x = map(str, zyx.split('_'))
-    z_num = int(z)
-    y_num = int(y)
-    x_num = int(x)
+scroll_name = config.cube_config.scroll_name
+papyrus_mask_factor = config.cube_config.factor
+zyx = config.cube_config.zyx
+z = config.cube_config.z
+y = config.cube_config.y
+x = config.cube_config.x
+z_num = int(z)
+y_num = int(y)
+x_num = int(x)
 
-if scroll_name == 's1' and not is_valid_coord([z_num, y_num, x_num]):
+if scroll_name == 's1' and not data_manager.is_valid_coord_s1([z_num, y_num, x_num]):
     print(f"Invalid coordinates: {z_num}, {y_num}, {x_num}")
-    z_num = find_nearest_valid_coord(z_num)
-    y_num = find_nearest_valid_coord(y_num)
-    x_num = find_nearest_valid_coord(x_num)
+    z_num = data_manager.find_nearest_valid_coord(z_num)
+    y_num = data_manager.find_nearest_valid_coord(y_num)
+    x_num = data_manager.find_nearest_valid_coord(x_num)
     print(f"Using nearest valid coordinates: {z_num}, {y_num}, {x_num}")
     z = str(z_num).zfill(5)
     y = str(y_num).zfill(5)
     x = str(x_num).zfill(5)
 
-chunk_size = cube_info.get('chunk_size', 256)
+chunk_size = config.cube_config.chunk_size
 global pad_amount
-pad_amount = cube_info.get('pad_amount', 100)
-brush_size = cube_info.get('brush_size', 4)
-author = cube_info.get('author', '-')
-
-main_label_layer_name = cube_info.get('main_label_layer_name', 'papyrus')
-
-raw_data_axis_order = cube_info.get('raw_data_axis_order', 'zyx') #assumes zyx if not set
-ink_pred_label_axis_order = cube_info.get('ink_pred_label_axis_order', None)
-
-nrrd_cube_path = cube_info.get('nrrd_cube_path', None)
-raw_data_zarr_path = cube_info.get('raw_data_zarr_path', None)
-ink_pred_zarr_path = cube_info.get('ink_pred_zarr_path', None)
+pad_amount = config.cube_config.pad_amount
+brush_size = config.cube_config.brush_size
+author = config.cube_config.author
+main_label_layer_name = config.cube_config.main_label_layer_name
 
 current_directory = os.getcwd()
-if nrrd_cube_path is None or nrrd_cube_path == '':
-    nrrd_cube_path = os.path.join(current_directory, 'data', 'nrrd_cubes', scroll_name) 
-
-using_raw_data_zarr = False
-if raw_data_zarr_path is not None and raw_data_zarr_path != '':
-    using_raw_data_zarr = True
-    if not os.path.exists(raw_data_zarr_path):
-        print(f"raw_data_zarr_path does not exist: {ink_pred_zarr_path}, trying raw data nrrd cubes")
-        using_raw_data_zarr = False
-
-using_ink_pred_zarr = False
-if ink_pred_zarr_path is not None and ink_pred_zarr_path != '':
-    using_ink_pred_zarr = True
-    if not os.path.exists(ink_pred_zarr_path):
-        print(f"ink_pred_zarr_path does not exist: {ink_pred_zarr_path}, will try loading output nrrd ink label cube")
-        using_ink_pred_zarr = False
 
 pad_state = False
-padded_raw_data = []
 
-raw_data = None 
-original_label_data = None
-original_ink_pred_data = None
-label_header = None
-raw_data_zarr_shape = None
-
-#load in raw data
-if not using_raw_data_zarr:
-    volume_file_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}', f'{z}_{y}_{x}_volume.nrrd')
-    raw_data, _ = nrrd.read(volume_file_path)
-    padded_raw_data = get_padded_nrrd_data(nrrd_cube_path, z, y, x, pad_amount)
-
-else: #using raw data zarr
-    raw_data_zarr_multi_res = zarr.open(raw_data_zarr_path, mode='r')
-    raw_data_zarr_shape = raw_data_zarr_multi_res[0].shape
-    raw_data = raw_data_zarr_multi_res[0][z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
-
-    padded_raw_data = get_padded_data_zarr(raw_data_zarr_multi_res[0], z_num, y_num, x_num, chunk_size, pad_amount)
-
-data = raw_data
-
-#If padded raw data isnt setup properly, set it to raw_data
-try:
-    if padded_raw_data is None or len(padded_raw_data) == 0:
-        padded_raw_data = raw_data
-except Exception as e:
-    print(f"An unexpected error occurred with padded_raw_data: {e}")
-    padded_raw_data = raw_data
-
-#load in papyrus label data (mask)
-#potential paths
-output_folder_path = os.path.join(current_directory, 'output',f'volumetric_labels_{scroll_name}')
-saved_label_file_path = os.path.join(output_folder_path, f"{z}_{y}_{x}",f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
-
-nrrd_cube_folder_path = os.path.join(nrrd_cube_path, f'{z}_{y}_{x}')
-mask_file_path = os.path.join(nrrd_cube_folder_path, f'{z}_{y}_{x}_mask.nrrd')
-
-#load saved label with highest priority
-#then load mask file with 2nd priority
-#then create mask from raw data thresholding with lowest priority
-if os.path.exists(saved_label_file_path):
-    original_label_data, label_header = nrrd.read(saved_label_file_path)
-elif os.path.exists(mask_file_path):
-    original_label_data, label_header = nrrd.read(mask_file_path)
-else:
-    #make label from thresholded raw data
-    original_label_data = threshold_mask(raw_data, factor=papyrus_mask_factor).astype(np.uint8)
-    os.makedirs(nrrd_cube_folder_path, exist_ok=True)
-    print("Creating Papyrus Label from thresholded raw data, may take a few seconds...")
-    nrrd.write(mask_file_path, original_label_data)
-    original_label_data, label_header = nrrd.read(mask_file_path)
-
-label_data = original_label_data
-
-if label_header is not None:
-    print(label_header)
-    label_header = defaultdict(list, label_header)
-    for key in ['saved_timestamps', 'open_timestamps']:
-        label_header[key] = ensure_list(label_header[key])
-    label_header['open_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    if 'author' not in label_header and author is not None and author != '':
-        label_header['author'] = author
-
-#load in ink prediction label if it exists
-saved_ink_pred_file_path = os.path.join(output_folder_path, f"{z}_{y}_{x}",f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_ink_label.nrrd")
-
-if os.path.exists(saved_ink_pred_file_path):
-    original_ink_pred_data, _ = nrrd.read(saved_ink_pred_file_path)
-elif using_ink_pred_zarr:
-    ink_threshold = cube_info.get('ink_threshold', 150)
-    ink_pred_zarr = zarr.open(ink_pred_zarr_path, mode='r')
-    ink_pred_dask = da.from_zarr(ink_pred_zarr)
-
-    #Attempt to align the ink prediction label with the raw data if information is available
-    if raw_data_axis_order is None or ink_pred_label_axis_order is None and raw_data_zarr_shape is not None:
-        transpose_params = get_transpose_params_from_shapes(raw_data_zarr_shape, ink_pred_dask.shape) 
-        ink_pred_dask = ink_pred_dask.transpose(transpose_params)
-        print("raw data zarr shape:", raw_data_zarr_shape,"transposed ink pred dask shape: ", ink_pred_dask.shape)
-    elif raw_data_axis_order is not None and ink_pred_label_axis_order is not None:
-        #use the both of the assigned manual axis order to align the ink label dask array to the raw data zarr array
-        transpose_params = get_transpose_params_from_axis_order(raw_data_axis_order, ink_pred_label_axis_order)
-        ink_pred_dask = ink_pred_dask.transpose(transpose_params)
-    else:
-        print("Could not ensure alignment of ink prediction label with raw data, using default axis order. Please check the axis order of the raw data and ink prediction label and set it in the config file if incorrect")
-    
-    ink_pred_region = ink_pred_dask[z_num:z_num+chunk_size, y_num:y_num+chunk_size, x_num:x_num+chunk_size]
-    thresholded_data = np.array(da.where(ink_pred_region < ink_threshold, 0, 1)).astype(np.uint8)
-    original_ink_pred_data = thresholded_data
-
-ink_pred_data = original_ink_pred_data
+data = data_manager.raw_data
+label_data = data_manager.original_label_data
+ink_pred_data = data_manager.original_ink_pred_data
 
 # Initialize the Napari viewer
 viewer = napari.Viewer()
@@ -213,6 +99,7 @@ papyrus_label_layer = viewer.add_labels(label_data, name=papyrus_label_name)
 if ink_pred_data is not None:
     ink_labels_layer = viewer.add_labels(ink_pred_data, name=ink_label_name)
 
+# Functions:
 def align_plane_with_selected_label(viewer):
     if viewer.layers[main_label_name].visible:
         align_layer = viewer.layers[main_label_name]
@@ -411,7 +298,7 @@ def process_value(value, data, erode, erosion_iterations, dilation_iterations, o
     return result
 
 @thread_worker
-def erode_dilate_labels_worker(data, erode=True, erosion_iterations=1, dilation_iterations=1, original_label_data=original_label_data):
+def erode_dilate_labels_worker(data, erode=True, erosion_iterations=1, dilation_iterations=1, original_label_data=data_manager.original_label_data):
     unique_values = np.unique(data[(data > 0) & (data < 254)])
     result = np.zeros_like(data, dtype=np.uint8)
     
@@ -888,7 +775,7 @@ def toggle_contextual_view(viewer):
                 layer.translate -= offset
         
         # Reset the data layer to the original (unpadded) data
-        viewer.layers[data_name].data = raw_data
+        viewer.layers[data_name].data = data_manager.raw_data
         shift_plane(viewer.layers[data_name], 0, padding_mode=True, padding=-pad_amount)
         # Adjust the camera position
         viewer.camera.center -= offset
@@ -904,7 +791,7 @@ def toggle_contextual_view(viewer):
                 layer.translate += offset
         
         # Set the data layer to the padded data
-        viewer.layers[data_name].data = padded_raw_data
+        viewer.layers[data_name].data = data_manager.padded_raw_data
         shift_plane(viewer.layers[data_name], 0, padding_mode=True, padding=pad_amount)
         # Adjust the camera position
         viewer.camera.center += offset
@@ -968,56 +855,37 @@ def dilate_labels(viewer):
     viewer.status = msg
     print(msg)
 
-async def save_nrrd_async(file_path, data, header=None):
-    def save_task():
-        nrrd.write(file_path, data, header=header)
-        print(f"Saved: {file_path}")
-
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, save_task)
-
 async def save_labels_async(viewer):
     msg = 'save labels'
     viewer.status = msg
     print(msg)
 
-    if viewer.layers[main_label_name].data.shape[0] != chunk_size:
+    if viewer.layers[main_label_name].data.shape[0] != config.cube_config.chunk_size:
         msg = "please remove additional context padding before saving"
         show_popup(msg)
         return
-
-    current_directory = os.getcwd()
-    file_path = os.path.join('output', f'volumetric_labels_{scroll_name}', f'{z}_{y}_{x}')
-    output_path = os.path.join(current_directory, file_path)
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
-
-    print(papyrus_label_layer.data.shape, papyrus_label_layer.data.dtype)
 
     if label_3d_name in viewer.layers:
         update_label_from_3d_edit_layer(viewer)
 
     tasks = []
 
-    if ink_pred_data is not None:
-        ink_file = os.path.join(output_path, f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_ink_label.nrrd")
-        tasks.append(save_nrrd_async(ink_file, ink_labels_layer.data))
+    # Save ink prediction data if it exists
+    if data_manager.original_ink_pred_data is not None:
+        ink_labels_data = viewer.layers[ink_label_name].data
+        tasks.append(data_manager.save_label_data_async(ink_labels_data, 'ink'))
 
-    if papyrus_label_layer.data is not None:
-        papyrus_file = os.path.join(output_path, f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_label.nrrd")
-        if label_header is not None:
-            label_header['saved_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            save_header = dict(label_header)
-            tasks.append(save_nrrd_async(papyrus_file, papyrus_label_layer.data, header=save_header))
-        else:
-            tasks.append(save_nrrd_async(papyrus_file, papyrus_label_layer.data))
+    # Save papyrus label data
+    papyrus_label_data = viewer.layers[papyrus_label_name].data
+    tasks.append(data_manager.save_label_data_async(papyrus_label_data, 'vol'))
 
-    raw_data_output_file = os.path.join(output_path, f"{z}_{y}_{x}_zyx_{chunk_size}_chunk_{scroll_name}_vol_raw.nrrd")
-    if not os.path.exists(raw_data_output_file):
-        tasks.append(save_nrrd_async(raw_data_output_file, viewer.layers[data_name].data))
+    # Save raw data if it hasn't been saved before
+    tasks.append(data_manager.save_raw_data_async())
 
+    # Wait for all save tasks to complete
     await asyncio.gather(*tasks)
 
+    output_path = data_manager.get_output_path()
     msg = f"Layers saved to {output_path}"
     show_popup(msg)
 
@@ -1036,11 +904,11 @@ def connected_components_preview(viewer):
     else:
         connected_components(viewer, preview=True)
     
-def bind_hotkeys(viewer, config, module=None, overwrite=True):
+def bind_hotkeys(viewer, hotkey_config, module=None, overwrite=True):
     if module is None:
         module = sys.modules['__main__']  # Get the main module
     
-    for func_name, keys in config.items():
+    for func_name, keys in hotkey_config.hotkey_config.items():
         # Skip if keys is None, an empty string, or an empty list
         if keys is None or keys == "" or (isinstance(keys, list) and len(keys) == 0):
             print(f"Warning: No key binding specified for function '{func_name}'. Skipping.")
@@ -1081,17 +949,33 @@ functions_dict = {
     'save_labels': save_labels,
 }
 
+def update_and_reload_data(viewer, data_manager, z=None, y=None, x=None):
+    data_manager.reload_data(z, y, x)
+
+    # Update the layers in the viewer
+    viewer.layers['Data'].data = data_manager.raw_data
+    viewer.layers['Papyrus Labels'].data = data_manager.original_label_data
+    if data_manager.original_ink_pred_data is not None:
+        if 'Ink Labels' in viewer.layers:
+            viewer.layers['Ink Labels'].data = data_manager.original_ink_pred_data
+        else:
+            viewer.add_labels(data_manager.original_ink_pred_data, name='Ink Labels')
+
+    # Refresh the viewer
+    viewer.reset_view()
+
 def update_global_erase_slice_width(value):
     global erase_slice_width
     erase_slice_width = value
     print(f"Global erase width updated to: {erase_slice_width}")
 
 # Create the GUI
-gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, hotkey_config, main_label_name)
+
+gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, config, config.cube_config.main_label_layer_name)
 gui.setup_napari_defaults(main_label_name)
 papyrus_label_layer.colormap = get_direct_label_colormap()
 
-bind_hotkeys(viewer, hotkey_config)
+bind_hotkeys(viewer, config.hotkey_config)
 set_camera_view(viewer)
 setup_brush_size_listener(viewer, main_label_name)
 
