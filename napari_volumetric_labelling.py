@@ -991,13 +991,19 @@ setup_brush_size_listener(viewer, main_label_name)
 
 # Add the threedee plugin dock widgets if using ink prediction data
 # if ink_pred_data is not None:
-viewer.window.add_plugin_dock_widget(
-    plugin_name="napari-threedee", widget_name="render plane manipulator"
-)
+try:
+    viewer.window.add_plugin_dock_widget(
+        plugin_name="napari-threedee", widget_name="render plane manipulator"
+    )
+except Exception as e:
+    print(f"Error adding render plane manipulator widget: {str(e)}")
 
-viewer.window.add_plugin_dock_widget(
-    "napari-threedee", widget_name="label annotator"
-)
+try:
+    viewer.window.add_plugin_dock_widget(
+        "napari-threedee", widget_name="label annotator"
+    )
+except Exception as e:
+    print(f"Error adding label annotator widget: {str(e)}")
 
 app = QApplication([])
 loop = QEventLoop(app)
