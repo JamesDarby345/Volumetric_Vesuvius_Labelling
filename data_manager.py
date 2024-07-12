@@ -10,6 +10,7 @@ from collections import defaultdict
 from scipy.ndimage import gaussian_filter
 from skimage.morphology import remove_small_objects, remove_small_holes
 import asyncio
+import ast
 
 class DataManager:
     def __init__(self, config):
@@ -20,6 +21,7 @@ class DataManager:
         self.original_ink_pred_data = None
         self.label_header = None
         self.raw_data_zarr_shape = None
+        self.nrrd_cube_path = self.config.nrrd_cube_path
 
         self.load_data()
 
@@ -34,6 +36,7 @@ class DataManager:
         self.original_ink_pred_data = None
         self.label_header = None
         self.raw_data_zarr_shape = None
+        self.nrrd_cube_path = self.config.nrrd_cube_path
 
         # Reload all data
         self.load_data()
@@ -42,6 +45,7 @@ class DataManager:
         self.load_raw_data()
         self.load_label_data()
         self.load_ink_pred_data()
+            
 
     def load_raw_data(self):
         if not self.config.using_raw_data_zarr:
@@ -72,7 +76,7 @@ class DataManager:
         elif os.path.exists(mask_file_path):
             self.original_label_data, self.label_header = nrrd.read(mask_file_path)
         else:
-            self.original_label_data = self.threshold_mask(self.raw_data, factor=self.config.papyrus_mask_factor).astype(np.uint8)
+            self.original_label_data = self.threshold_mask(self.raw_data, factor=self.config.factor).astype(np.uint8)
             os.makedirs(nrrd_cube_folder_path, exist_ok=True)
             print("Creating Papyrus Label from thresholded raw data, may take a few seconds...")
             nrrd.write(mask_file_path, self.original_label_data)
@@ -332,7 +336,31 @@ class DataManager:
         if label_type == 'vol':
             header = self.label_header
             if header is not None:
-                header['saved_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                # Parse the existing timestamps
+                if 'saved_timestamps' in header:
+                    try:
+                        saved_timestamps = ast.literal_eval(header['saved_timestamps'])
+                    except:
+                        saved_timestamps = []
+                else:
+                    saved_timestamps = []
+                
+                # Append the new timestamp
+                saved_timestamps.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                
+                # Update the header with the new list of timestamps
+                header['saved_timestamps'] = str(saved_timestamps)
+                
+                # Do the same for open_timestamps
+                if 'open_timestamps' in header:
+                    try:
+                        open_timestamps = ast.literal_eval(header['open_timestamps'])
+                    except:
+                        open_timestamps = []
+                else:
+                    open_timestamps = []
+                header['open_timestamps'] = str(open_timestamps)
+                
                 header = dict(header)
         else:
             header = None

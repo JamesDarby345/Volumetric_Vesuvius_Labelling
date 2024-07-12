@@ -2,6 +2,7 @@
 
 import yaml
 from pathlib import Path
+import os
 
 class CubeConfig:
     def __init__(self, cube_info):
@@ -79,7 +80,10 @@ class CubeConfig:
 
     @property
     def nrrd_cube_path(self):
-        return self.cube_info.get('nrrd_cube_path', '')
+        nrrd_cube_path = self.cube_info.get('nrrd_cube_path', '')
+        if nrrd_cube_path is None or nrrd_cube_path == '':
+            nrrd_cube_path = os.path.join(os.getcwd(), 'data', 'nrrd_cubes', self.cube_info.get('scroll_name', '')) 
+        return nrrd_cube_path
 
     @property
     def raw_data_zarr_path(self):
