@@ -4,6 +4,8 @@ import yaml
 from pathlib import Path
 import os
 
+# config.py
+
 class CubeConfig:
     def __init__(self, cube_info):
         self.cube_info = cube_info
@@ -15,11 +17,30 @@ class CubeConfig:
     def zyx(self):
         return self.cube_info.get('zyx')
 
+    @zyx.setter
+    def zyx(self, value):
+        if isinstance(value, str) and len(value.split('_')) == 3:
+            self.cube_info['zyx'] = value
+            z, y, x = value.split('_')
+            self.z = z
+            self.y = y
+            self.x = x
+        else:
+            raise ValueError("ZYX must be a string in the format 'ZZZZZ_YYYYY_XXXXX'")
+
     @property
     def z(self):
         if self.zyx:
             return self.zyx.split('_')[0]
         return self.cube_info.get('z', '02000')
+
+    @z.setter
+    def z(self, value):
+        value = str(value).zfill(5)
+        self.cube_info['z'] = value
+        if 'zyx' in self.cube_info:
+            y, x = self.cube_info['zyx'].split('_')[1:]
+            self.cube_info['zyx'] = f"{value}_{y}_{x}"
 
     @property
     def y(self):
@@ -27,11 +48,40 @@ class CubeConfig:
             return self.zyx.split('_')[1]
         return self.cube_info.get('y', '02000')
 
+    @y.setter
+    def y(self, value):
+        value = str(value).zfill(5)
+        self.cube_info['y'] = value
+        if 'zyx' in self.cube_info:
+            z, x = self.cube_info['zyx'].split('_')[0], self.cube_info['zyx'].split('_')[2]
+            self.cube_info['zyx'] = f"{z}_{value}_{x}"
+
     @property
     def x(self):
         if self.zyx:
             return self.zyx.split('_')[2]
         return self.cube_info.get('x', '02000')
+
+    @x.setter
+    def x(self, value):
+        value = str(value).zfill(5)
+        self.cube_info['x'] = value
+        if 'zyx' in self.cube_info:
+            z, y = self.cube_info['zyx'].split('_')[:2]
+            self.cube_info['zyx'] = f"{z}_{y}_{value}"
+
+    def update_coordinates(self, z=None, y=None, x=None):
+        if z is not None:
+            self.z = z
+        if y is not None:
+            self.y = y
+        if x is not None:
+            self.x = x
+        
+        if z is not None and y is not None and x is not None:
+            self.zyx = f"{self.z}_{self.y}_{self.x}"
+        elif 'zyx' in self.cube_info:
+            del self.cube_info['zyx']
 
     @property
     def z_num(self):
@@ -44,19 +94,6 @@ class CubeConfig:
     @property
     def x_num(self):
         return int(self.x)
-    
-    def update_coordinates(self, z=None, y=None, x=None):
-        if z is not None:
-            self.cube_info['z'] = str(z).zfill(5)
-        if y is not None:
-            self.cube_info['y'] = str(y).zfill(5)
-        if x is not None:
-            self.cube_info['x'] = str(x).zfill(5)
-        
-        if z is not None and y is not None and x is not None:
-            self.cube_info['zyx'] = f"{self.z}_{self.y}_{self.x}"
-        elif 'zyx' in self.cube_info:
-            del self.cube_info['zyx']
 
     @property
     def scroll_name(self):

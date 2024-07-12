@@ -25,10 +25,10 @@ class DataManager:
 
         self.load_data()
 
-    def reload_data(self, z=None, y=None, x=None):
-        if z is not None and y is not None and x is not None:
-            self.config.update_coordinates(z, y, x)
-        
+    def reload_data(self, z, y, x):
+        print(f"Reloading data in data manager {self.config.z}_{self.config.y}_{self.config.x}",z,y,x)
+        self.config.update_coordinates(z=z, y=y, x=x)
+        print(f"Reloading data in data manager {self.config.z}_{self.config.y}_{self.config.x}")
         # Reset all data attributes
         self.raw_data = None
         self.padded_raw_data = None

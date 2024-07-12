@@ -26,7 +26,6 @@ config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.
 
 config = Config(config_path)
 
-
 data_manager = DataManager(config.cube_config)
 
 # Data location and size parameters
@@ -934,6 +933,23 @@ def bind_hotkeys(viewer, hotkey_config, module=None, overwrite=True):
             except (ValueError, TypeError) as e:
                 print(f"Error binding key '{keys}' to function '{func_name}': {str(e)}")
 
+def update_and_reload_data(viewer, data_manager, config, z, y, x):
+    print(f"Updating coordinates to z={z}, y={y}, x={x}")
+    config.cube_config.update_coordinates(z, y, x)
+    data_manager.reload_data(z,y,x)
+
+    # Update the layers in the viewer
+    viewer.layers['Data'].data = data_manager.raw_data
+    viewer.layers['Papyrus Labels'].data = data_manager.original_label_data
+    if data_manager.original_ink_pred_data is not None:
+        if 'Ink Labels' in viewer.layers:
+            viewer.layers['Ink Labels'].data = data_manager.original_ink_pred_data
+        else:
+            viewer.add_labels(data_manager.original_ink_pred_data, name='Ink Labels')
+    else:
+        if 'Ink Labels' in viewer.layers:
+            viewer.layers.remove('Ink Labels')
+
 # Create a dictionary of functions to pass to the GUI
 functions_dict = {
     'erode_labels': erode_labels,
@@ -944,22 +960,8 @@ functions_dict = {
     'cut_label_at_oblique_plane': cut_label_at_oblique_plane,
     'connected_components': connected_components,
     'save_labels': save_labels,
+    'update_and_reload_data': lambda z, y, x: update_and_reload_data(viewer, data_manager, config, z, y, x),
 }
-
-def update_and_reload_data(viewer, data_manager, z=None, y=None, x=None):
-    data_manager.reload_data(z, y, x)
-
-    # Update the layers in the viewer
-    viewer.layers['Data'].data = data_manager.raw_data
-    viewer.layers['Papyrus Labels'].data = data_manager.original_label_data
-    if data_manager.original_ink_pred_data is not None:
-        if 'Ink Labels' in viewer.layers:
-            viewer.layers['Ink Labels'].data = data_manager.original_ink_pred_data
-        else:
-            viewer.add_labels(data_manager.original_ink_pred_data, name='Ink Labels')
-
-    # Refresh the viewer
-    viewer.reset_view()
 
 def update_global_erase_slice_width(value):
     global erase_slice_width

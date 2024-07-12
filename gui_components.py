@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QPushButton, QLabel, 
-                             QVBoxLayout, QScrollArea, QSizePolicy, QSpinBox, QColorDialog)
+                             QVBoxLayout, QScrollArea, QSizePolicy, QSpinBox, QColorDialog,
+                             QLineEdit, QGridLayout)
 from PyQt5.QtCore import Qt
 from helper import *
 
@@ -109,6 +110,16 @@ class VesuviusGUI:
         self.erase_slice_width_spinbox.valueChanged.connect(self.update_erase_slice_width)
         layout.addWidget(self.erase_slice_width_spinbox)
         return layout
+    
+    def create_zyx_input(self):
+        layout = QHBoxLayout()
+
+        layout.addWidget(QLabel("ZYX:"))
+        self.zyx_input = QLineEdit(self.config.cube_config.zyx)
+        self.zyx_input.setPlaceholderText("ZZZZZ_YYYYY_XXXXX")
+        self.zyx_input.returnPressed.connect(self.update_zyx)
+        layout.addWidget(self.zyx_input)
+        return layout
 
     def create_instruction_scroll_area(self):
         text_container = QWidget()
@@ -137,6 +148,7 @@ class VesuviusGUI:
 
         button_container = self.create_button_container()
         erase_width_layout = self.create_erase_width_input()
+        zyx_layout = self.create_zyx_input()
 
         main_container = QWidget()
         main_layout = QVBoxLayout()
@@ -148,6 +160,7 @@ class VesuviusGUI:
         main_layout.addWidget(button_container)
         main_layout.addLayout(erase_width_layout)
         main_layout.addWidget(color_picker_widget)
+        main_layout.addLayout(zyx_layout)
 
         self.viewer.window.add_dock_widget(main_container, area='right')
 
@@ -158,6 +171,14 @@ class VesuviusGUI:
         self.erase_slice_width = value
         self.update_global_erase_slice_width(value)
         print(f"Erase width updated to: {self.erase_slice_width}")
+
+    def update_zyx(self):
+        new_zyx = self.zyx_input.text()
+        if self.validate_zyx(new_zyx):
+            z, y, x = new_zyx.split('_')
+            self.functions['update_and_reload_data'](z, y, x)
+        else:
+            show_popup("Invalid ZYX format. Please use ZZZZZ_YYYYY_XXXXX.")
 
     def setup_napari_defaults(self, main_label_layer_name='Papyrus Labels'):
         viewer = self.viewer
@@ -198,7 +219,12 @@ class VesuviusGUI:
                 viewer.layers[layer.name].affine = np.eye(3)  # Ensure the affine transform is identity for proper rendering
                 viewer.layers[layer.name].blending = 'opaque'
                 viewer.layers.selection.active = viewer.layers[layer.name]
-
+    
+    @staticmethod
+    def validate_zyx(zyx):
+        parts = zyx.split('_')
+        return len(parts) == 3 and all(len(part) == 5 and part.isdigit() for part in parts)
+    
     # Define button callback methods
     def dilate_labels_gui(self):
         self.functions['dilate_labels'](self.viewer)
