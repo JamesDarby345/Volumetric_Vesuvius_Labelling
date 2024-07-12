@@ -851,29 +851,24 @@ def dilate_labels(viewer):
     viewer.status = msg
     print(msg)
 
-async def save_labels_async(viewer):
+async def save_labels_async(viewer, papyrus_labels, ink_labels, should_show_popup=True):
     msg = 'save labels'
     viewer.status = msg
     print(msg)
 
-    if viewer.layers[main_label_name].data.shape[0] != config.cube_config.chunk_size:
+    if papyrus_labels.shape[0] != config.cube_config.chunk_size:
         msg = "please remove additional context padding before saving"
         show_popup(msg)
         return
 
-    if label_3d_name in viewer.layers:
-        update_label_from_3d_edit_layer(viewer)
-
     tasks = []
 
     # Save ink prediction data if it exists
-    if data_manager.original_ink_pred_data is not None:
-        ink_labels_data = viewer.layers[ink_label_name].data
-        tasks.append(data_manager.save_label_data_async(ink_labels_data, 'ink'))
+    if ink_labels is not None:
+        tasks.append(data_manager.save_label_data_async(ink_labels, 'ink'))
 
     # Save papyrus label data
-    papyrus_label_data = viewer.layers[papyrus_label_name].data
-    tasks.append(data_manager.save_label_data_async(papyrus_label_data, 'vol'))
+    tasks.append(data_manager.save_label_data_async(papyrus_labels, 'vol'))
 
     # Save raw data if it hasn't been saved before
     tasks.append(data_manager.save_raw_data_async())
@@ -882,11 +877,17 @@ async def save_labels_async(viewer):
     await asyncio.gather(*tasks)
 
     output_path = data_manager.get_output_path()
-    msg = f"Layers saved to {output_path}"
-    show_popup(msg)
+    if should_show_popup:
+        msg = f"Layers saved to {output_path}"
+        show_popup(msg)
 
-def save_labels(viewer, should_show_popup=True):
-    asyncio.ensure_future(save_labels_async(viewer))
+def save_labels(viewer, papyrus_labels=None, ink_labels=None, should_show_popup=True):
+    if papyrus_labels is None:
+        papyrus_labels = viewer.layers['Papyrus Labels'].data
+    if ink_labels is None and 'Ink Labels' in viewer.layers:
+        ink_labels = viewer.layers['Ink Labels'].data
+    
+    asyncio.ensure_future(save_labels_async(viewer, papyrus_labels, ink_labels, should_show_popup))
     if should_show_popup:
         show_popup("Saving has started. You will be notified when it's complete.")
 
@@ -939,16 +940,25 @@ def update_and_reload_data(viewer, data_manager, config, z, y, x):
     data_manager.reload_data(z,y,x)
 
     # Update the layers in the viewer
-    viewer.layers['Data'].data = data_manager.raw_data
-    viewer.layers['Papyrus Labels'].data = data_manager.original_label_data
+    viewer.layers[data_name].data = data_manager.raw_data
+    viewer.layers[papyrus_label_name].data = data_manager.original_label_data
     if data_manager.original_ink_pred_data is not None:
-        if 'Ink Labels' in viewer.layers:
-            viewer.layers['Ink Labels'].data = data_manager.original_ink_pred_data
+        if ink_label_name in viewer.layers:
+            viewer.layers[ink_label_name].data = data_manager.original_ink_pred_data
         else:
-            viewer.add_labels(data_manager.original_ink_pred_data, name='Ink Labels')
+            viewer.add_labels(data_manager.original_ink_pred_data, name=ink_label_name)
     else:
-        if 'Ink Labels' in viewer.layers:
-            viewer.layers.remove('Ink Labels')
+        if ink_label_name in viewer.layers:
+            viewer.layers.remove(ink_label_name)
+    if label_3d_name in viewer.layers:
+        viewer.layers.remove(label_3d_name)
+    if cc_preview_name in viewer.layers:
+        viewer.layers.remove(cc_preview_name)
+    if ff_name in viewer.layers:
+        viewer.layers.remove(ff_name)
+
+    # Update the ZYX input in the GUI
+    gui.zyx_widget.zyx_input.setText(f"{z}_{y}_{x}")
 
 # Create a dictionary of functions to pass to the GUI
 functions_dict = {
@@ -961,6 +971,7 @@ functions_dict = {
     'connected_components': connected_components,
     'save_labels': save_labels,
     'update_and_reload_data': lambda z, y, x: update_and_reload_data(viewer, data_manager, config, z, y, x),
+    'save_labels': lambda: save_labels(viewer, should_show_popup=False),
 }
 
 def update_global_erase_slice_width(value):

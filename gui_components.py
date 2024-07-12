@@ -16,6 +16,76 @@ def pick_color(viewer):
         # Set the background color of the canvas
         viewer.window._qt_viewer.canvas.bgcolor = color_tuple
 
+class ZYXNavigationWidget(QWidget):
+    def __init__(self, config, update_function, save_function):
+        super().__init__()
+        self.config = config
+        self.update_function = update_function
+        self.save_function = save_function
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
+        # ZYX input
+        zyx_layout = QHBoxLayout()
+        zyx_layout.addWidget(QLabel("ZYX:"))
+        self.zyx_input = QLineEdit(self.config.cube_config.zyx)
+        self.zyx_input.setPlaceholderText("ZZZZZ_YYYYY_XXXXX")
+        self.zyx_input.returnPressed.connect(self.update_zyx)
+        zyx_layout.addWidget(self.zyx_input)
+        layout.addLayout(zyx_layout)
+
+        # Navigation buttons
+        axes = ['Z', 'Y', 'X']
+        for axis in axes:
+            axis_layout = QHBoxLayout()
+            axis_layout.addWidget(QLabel(f"{axis}:"))
+            prev_button = QPushButton(f"Previous")
+            next_button = QPushButton(f"Next")
+            prev_button.clicked.connect(lambda checked, a=axis, d=-1: self.navigate_cube(a, d))
+            next_button.clicked.connect(lambda checked, a=axis, d=1: self.navigate_cube(a, d))
+            axis_layout.addWidget(prev_button)
+            axis_layout.addWidget(next_button)
+            layout.addLayout(axis_layout)
+
+    def update_zyx(self):
+        new_zyx = self.zyx_input.text()
+        if self.validate_zyx(new_zyx):
+            self.save_function()
+            z, y, x = new_zyx.split('_')
+            self.update_function(z, y, x)
+        else:
+            show_popup("Invalid ZYX format. Please use ZZZZZ_YYYYY_XXXXX.")
+
+    def navigate_cube(self, axis, direction):
+        # Save current labels before navigating
+        self.save_function()
+        
+        current_z = int(self.config.cube_config.z)
+        current_y = int(self.config.cube_config.y)
+        current_x = int(self.config.cube_config.x)
+        chunk_size = self.config.cube_config.chunk_size
+
+        if axis == 'Z':
+            new_z = current_z + (direction * chunk_size)
+            new_zyx = f"{new_z:05d}_{current_y:05d}_{current_x:05d}"
+        elif axis == 'Y':
+            new_y = current_y + (direction * chunk_size)
+            new_zyx = f"{current_z:05d}_{new_y:05d}_{current_x:05d}"
+        elif axis == 'X':
+            new_x = current_x + (direction * chunk_size)
+            new_zyx = f"{current_z:05d}_{current_y:05d}_{new_x:05d}"
+
+        self.zyx_input.setText(new_zyx)
+        self.update_zyx()
+
+    @staticmethod
+    def validate_zyx(zyx):
+        parts = zyx.split('_')
+        return len(parts) == 3 and all(len(part) == 5 and part.isdigit() for part in parts)
+
 # Create a custom widget with a button to open the color picker
 class ColorPickerWidget(QWidget):
     def __init__(self, viewer):
@@ -111,15 +181,6 @@ class VesuviusGUI:
         layout.addWidget(self.erase_slice_width_spinbox)
         return layout
     
-    def create_zyx_input(self):
-        layout = QHBoxLayout()
-
-        layout.addWidget(QLabel("ZYX:"))
-        self.zyx_input = QLineEdit(self.config.cube_config.zyx)
-        self.zyx_input.setPlaceholderText("ZZZZZ_YYYYY_XXXXX")
-        self.zyx_input.returnPressed.connect(self.update_zyx)
-        layout.addWidget(self.zyx_input)
-        return layout
 
     def create_instruction_scroll_area(self):
         text_container = QWidget()
@@ -136,6 +197,9 @@ class VesuviusGUI:
 
     def setup_gui(self):
         # Create custom button widgets
+        self.zyx_widget = ZYXNavigationWidget(self.config, self.functions['update_and_reload_data'], self.functions['save_labels'])
+        self.viewer.window.add_dock_widget(self.zyx_widget, area='left')
+
         self.dilate_button = CustomButtonWidget("Dilate Labels", self.get_key_string('dilate_labels'), self.dilate_labels_gui)
         self.erode_button = CustomButtonWidget("Erode Labels", self.get_key_string('erode_labels'), self.erode_labels_gui)
         self.full_view_button = CustomButtonWidget("Toggle Full Label View", self.get_key_string('full_label_view'), self.toggle_full_label_view)
@@ -148,7 +212,6 @@ class VesuviusGUI:
 
         button_container = self.create_button_container()
         erase_width_layout = self.create_erase_width_input()
-        zyx_layout = self.create_zyx_input()
 
         main_container = QWidget()
         main_layout = QVBoxLayout()
@@ -160,7 +223,6 @@ class VesuviusGUI:
         main_layout.addWidget(button_container)
         main_layout.addLayout(erase_width_layout)
         main_layout.addWidget(color_picker_widget)
-        main_layout.addLayout(zyx_layout)
 
         self.viewer.window.add_dock_widget(main_container, area='right')
 
@@ -171,14 +233,6 @@ class VesuviusGUI:
         self.erase_slice_width = value
         self.update_global_erase_slice_width(value)
         print(f"Erase width updated to: {self.erase_slice_width}")
-
-    def update_zyx(self):
-        new_zyx = self.zyx_input.text()
-        if self.validate_zyx(new_zyx):
-            z, y, x = new_zyx.split('_')
-            self.functions['update_and_reload_data'](z, y, x)
-        else:
-            show_popup("Invalid ZYX format. Please use ZZZZZ_YYYYY_XXXXX.")
 
     def setup_napari_defaults(self, main_label_layer_name='Papyrus Labels'):
         viewer = self.viewer
@@ -219,11 +273,6 @@ class VesuviusGUI:
                 viewer.layers[layer.name].affine = np.eye(3)  # Ensure the affine transform is identity for proper rendering
                 viewer.layers[layer.name].blending = 'opaque'
                 viewer.layers.selection.active = viewer.layers[layer.name]
-    
-    @staticmethod
-    def validate_zyx(zyx):
-        parts = zyx.split('_')
-        return len(parts) == 3 and all(len(part) == 5 and part.isdigit() for part in parts)
     
     # Define button callback methods
     def dilate_labels_gui(self):
