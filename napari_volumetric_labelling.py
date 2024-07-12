@@ -1,9 +1,6 @@
-import nrrd
 import napari
 import os
 import numpy as np
-import zarr
-from dask import array as da
 from helper import *
 from gui_components import VesuviusGUI
 from napari.layers import Image
@@ -16,14 +13,14 @@ import sys
 from collections import namedtuple
 from vispy.scene.cameras.perspective import Base3DRotationCamera
 from vispy.util import keys
-from datetime import datetime
-from collections import defaultdict
 import asyncio
 from qasync import QEventLoop, QApplication
 from data_manager import DataManager
 from config import Config  # Assuming you create a Config class
+import warnings
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
+warnings.filterwarnings("ignore", message="Contours are not displayed during 3D rendering")
 
 config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
 
