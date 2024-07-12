@@ -18,11 +18,19 @@ from vispy.scene.cameras.perspective import PerspectiveCamera
 from vispy.util import keys
 from collections import deque
 import numba
-import zarr 
 import ast
 from sklearn.decomposition import PCA
-from skimage import measure
+from scipy.ndimage import gaussian_filter
+import yaml
+from pathlib import Path
 
+def read_config(config_path='napari_config.yaml'):
+    config_path = Path(config_path)
+    if config_path.exists():
+        with open(config_path, 'r') as file:
+            config = yaml.safe_load(file)
+            return config.get('cube_info',{}), config.get('customizable_hotkeys', {})
+    return {}
 
 def get_transpose_params_from_shapes(shape1, shape2):
     # Check if the shapes have the same number of dimensions
@@ -115,8 +123,10 @@ def find_nearest_valid_coord(num):
     return max(result, 208)
 
 
-def threshold_mask(array_3d, factor=1.0, min_size=200, hole_size=200):
+def threshold_mask(array_3d, factor=1.0, min_size=1000, hole_size=1000):
     # Calculate the mean of the entire 3D array
+    sigma = 2
+    array_3d = gaussian_filter(array_3d, sigma=sigma)
     threshold = np.mean(array_3d) / factor
     
     # Create initial mask

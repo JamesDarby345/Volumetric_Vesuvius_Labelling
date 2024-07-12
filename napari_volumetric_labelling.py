@@ -12,30 +12,17 @@ from qtpy.QtWidgets import QMessageBox
 from qtpy.QtCore import QTimer
 from napari.qt.threading import thread_worker
 from napari.utils.notifications import show_info
-import yaml
-from pathlib import Path
 import sys
 from collections import namedtuple
 from vispy.scene.cameras.perspective import Base3DRotationCamera
 from vispy.util import keys
 from datetime import datetime
 from collections import defaultdict
-from napari_threedee.manipulators._qt import QtRenderPlaneManipulatorWidget
-
-
 import asyncio
 from qasync import QEventLoop, QApplication
-from concurrent.futures import ThreadPoolExecutor
+
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
-
-def read_config(config_path='napari_config.yaml'):
-    config_path = Path(config_path)
-    if config_path.exists():
-        with open(config_path, 'r') as file:
-            config = yaml.safe_load(file)
-            return config.get('cube_info',{}), config.get('customizable_hotkeys', {})
-    return {}
 
 config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
 
