@@ -1,5 +1,5 @@
 pynrrd
-napari[all]
+napari[all]==0.4.19
 numpy
 zarr
 blosc2
@@ -11,3 +11,4 @@ ipykernel
 napari-threedee
 scikit-learn
 qasync
+PyQt5

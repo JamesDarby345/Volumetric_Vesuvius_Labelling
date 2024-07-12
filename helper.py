@@ -1,15 +1,6 @@
 import numpy as np
-from skimage.color import gray2rgb
-from skimage.segmentation import find_boundaries
-from skimage.util import img_as_float
-from skimage.morphology import dilation, square, remove_small_objects, remove_small_holes
-import random
+from skimage.morphology import remove_small_objects, remove_small_holes
 import scipy.ndimage
-from matplotlib import pyplot as plt
-from scipy.ndimage import binary_dilation
-from scipy.interpolate import interp1d
-import os
-import nrrd
 from qtpy.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QInputDialog, QWidget
 from napari.utils.colormaps import DirectLabelColormap
@@ -18,7 +9,6 @@ from vispy.scene.cameras.perspective import PerspectiveCamera
 from vispy.util import keys
 from collections import deque
 import numba
-import ast
 from sklearn.decomposition import PCA
 from scipy.ndimage import gaussian_filter
 import yaml
