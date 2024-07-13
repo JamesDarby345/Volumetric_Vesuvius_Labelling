@@ -71,23 +71,23 @@ def find_best_intersecting_plane_napari(array_3d):
     return napari_position, napari_normal
 
 
-def threshold_mask(array_3d, factor=1.0, min_size=1000, hole_size=1000):
-    # Calculate the mean of the entire 3D array
-    sigma = 2
-    array_3d = gaussian_filter(array_3d, sigma=sigma)
-    threshold = np.mean(array_3d) / factor
+# def threshold_mask(array_3d, factor=1.0, min_size=1000, hole_size=1000):
+#     # Calculate the mean of the entire 3D array
+#     sigma = 2
+#     array_3d = gaussian_filter(array_3d, sigma=sigma)
+#     threshold = np.mean(array_3d) / factor
     
-    # Create initial mask
-    mask = array_3d > threshold
+#     # Create initial mask
+#     mask = array_3d > threshold
     
-    # Remove small objects and holes
-    mask = remove_small_objects(mask, min_size=min_size)
-    mask = remove_small_holes(mask, area_threshold=hole_size)
+#     # Remove small objects and holes
+#     mask = remove_small_objects(mask, min_size=min_size)
+#     mask = remove_small_holes(mask, area_threshold=hole_size)
 
-    #remove bright spots, top 0.5% brightest voxels
-    bright_spot_mask_arr = bright_spot_mask(array_3d)
-    mask = mask | bright_spot_mask_arr
-    return mask
+#     #remove bright spots, top 0.5% brightest voxels
+#     bright_spot_mask_arr = bright_spot_mask(array_3d)
+#     mask = mask | bright_spot_mask_arr
+#     return mask
 
 #monkey-patch the camera controls
 def patched_viewbox_mouse_event(self, event):
