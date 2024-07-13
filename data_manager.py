@@ -25,9 +25,7 @@ class DataManager:
 
         self.load_data()
 
-    def reload_data(self, z, y, x):
-        print(f"Reloading data in data manager {self.config.z}_{self.config.y}_{self.config.x}",z,y,x)
-        self.config.update_coordinates(z=z, y=y, x=x)
+    def reload_data(self):
         print(f"Reloading data in data manager {self.config.z}_{self.config.y}_{self.config.x}")
         # Reset all data attributes
         self.raw_data = None
@@ -35,7 +33,6 @@ class DataManager:
         self.original_label_data = None
         self.original_ink_pred_data = None
         self.label_header = None
-        self.raw_data_zarr_shape = None
         self.nrrd_cube_path = self.config.nrrd_cube_path
 
         # Reload all data
@@ -72,8 +69,10 @@ class DataManager:
         mask_file_path = os.path.join(nrrd_cube_folder_path, f'{self.config.z}_{self.config.y}_{self.config.x}_mask.nrrd')
 
         if os.path.exists(saved_label_file_path):
+            print(f"Loading label data from saved label {saved_label_file_path}")
             self.original_label_data, self.label_header = nrrd.read(saved_label_file_path)
         elif os.path.exists(mask_file_path):
+            print(f"Loading label data from provided mask {mask_file_path}")
             self.original_label_data, self.label_header = nrrd.read(mask_file_path)
         else:
             self.original_label_data = self.threshold_mask(self.raw_data, factor=self.config.factor).astype(np.uint8)
@@ -275,63 +274,37 @@ class DataManager:
         mask = data > threshold
         return mask
 
-    @staticmethod
-    def is_valid_coord_s1(num_or_list):
-        if isinstance(num_or_list, (int, float)):
-            difference = abs(num_or_list - 2000)
-            return difference % 256 == 0
-        elif isinstance(num_or_list, (list, np.ndarray)):
-            differences = np.abs(np.array(num_or_list) - 2000)
-            return (differences % 256 == 0).all()
-        else:
-            raise TypeError("Input must be a number, list, or numpy array")
-
-    @staticmethod
-    def find_nearest_valid_coord(num):
-        difference = num - 2000
-        quotient = difference // 256
-        remainder = difference % 256
-
-        if remainder == 0:
-            result = num
-        elif remainder > 128:
-            result = 2000 + 256 * (quotient + 1)
-        else:
-            result = 2000 + 256 * quotient
+    # def save_label_data(self, label_data, label_type='vol'):
+    #     output_folder_path = os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.config.scroll_name}')
+    #     file_path = os.path.join(output_folder_path, 
+    #                              f"{self.config.z}_{self.config.y}_{self.config.x}",
+    #                              f"{self.config.z}_{self.config.y}_{self.config.x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_{label_type}_label.nrrd")
         
-        return max(result, 208)
+    #     os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+    #     if label_type == 'vol' and self.label_header is not None:
+    #         self.label_header['saved_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    #         nrrd.write(file_path, label_data, header=dict(self.label_header))
+    #     else:
+    #         nrrd.write(file_path, label_data)
+        
+    #     print(f"Saved {label_type} label to {file_path}")
 
-    def save_label_data(self, label_data, label_type='vol'):
-        output_folder_path = os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.config.scroll_name}')
-        file_path = os.path.join(output_folder_path, 
-                                 f"{self.config.z}_{self.config.y}_{self.config.x}",
-                                 f"{self.config.z}_{self.config.y}_{self.config.x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_{label_type}_label.nrrd")
+    # def save_raw_data(self):
+    #     output_folder_path = os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.config.scroll_name}')
+    #     file_path = os.path.join(output_folder_path, 
+    #                              f"{self.config.z}_{self.config.y}_{self.config.x}",
+    #                              f"{self.config.z}_{self.config.y}_{self.config.x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_vol_raw.nrrd")
         
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        
-        if label_type == 'vol' and self.label_header is not None:
-            self.label_header['saved_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            nrrd.write(file_path, label_data, header=dict(self.label_header))
-        else:
-            nrrd.write(file_path, label_data)
-        
-        print(f"Saved {label_type} label to {file_path}")
+    #     if not os.path.exists(file_path):
+    #         os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    #         nrrd.write(file_path, self.raw_data)
+    #         print(f"Saved raw data to {file_path}")
+    #     else:
+    #         print(f"Raw data file already exists at {file_path}")
 
-    def save_raw_data(self):
-        output_folder_path = os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.config.scroll_name}')
-        file_path = os.path.join(output_folder_path, 
-                                 f"{self.config.z}_{self.config.y}_{self.config.x}",
-                                 f"{self.config.z}_{self.config.y}_{self.config.x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_vol_raw.nrrd")
-        
-        if not os.path.exists(file_path):
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            nrrd.write(file_path, self.raw_data)
-            print(f"Saved raw data to {file_path}")
-        else:
-            print(f"Raw data file already exists at {file_path}")
-
-    async def save_label_data_async(self, data, label_type):
-        file_path = self.get_label_file_path(label_type)
+    async def save_label_data_async(self, z,y,x, data, label_type):
+        file_path = self.get_label_file_path(z,y,x, label_type)
         
         if label_type == 'vol':
             header = self.label_header
@@ -367,8 +340,8 @@ class DataManager:
 
         await self._save_nrrd_async(file_path, data, header)
 
-    async def save_raw_data_async(self):
-        file_path = self.get_raw_data_file_path()
+    async def save_raw_data_async(self,z,y,x):
+        file_path = self.get_raw_data_file_path(z,y,x)
         if not os.path.exists(file_path):
             await self._save_nrrd_async(file_path, self.raw_data)
 
@@ -381,14 +354,14 @@ class DataManager:
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, save_task)
 
-    def get_label_file_path(self, label_type):
-        return os.path.join(self.get_output_path(), 
-                            f"{self.config.z}_{self.config.y}_{self.config.x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_{label_type}_label.nrrd")
+    def get_label_file_path(self,z,y,x, label_type):
+        return os.path.join(self.get_output_path(z,y,x), 
+                            f"{z}_{y}_{x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_{label_type}_label.nrrd")
 
-    def get_raw_data_file_path(self):
-        return os.path.join(self.get_output_path(), 
-                            f"{self.config.z}_{self.config.y}_{self.config.x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_vol_raw.nrrd")
+    def get_raw_data_file_path(self,z,y,x,):
+        return os.path.join(self.get_output_path(z,y,x), 
+                            f"{z}_{y}_{x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_vol_raw.nrrd")
 
-    def get_output_path(self):
+    def get_output_path(self, z,y,x):
         return os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.config.scroll_name}', 
-                            f'{self.config.z}_{self.config.y}_{self.config.x}')
+                            f'{z}_{y}_{x}')

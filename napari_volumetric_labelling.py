@@ -21,16 +21,13 @@ import warnings
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
 warnings.filterwarnings("ignore", message="Contours are not displayed during 3D rendering")
+warnings.filterwarnings("ignore", message="Valid config keys have changed in V2:")
+warnings.filterwarnings("ignore", message="Refusing to run a QApplication with no topLevelWidgets.")
 
 config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
-
 config = Config(config_path)
 
-data_manager = DataManager(config.cube_config)
-
-# Data location and size parameters
 scroll_name = config.cube_config.scroll_name
-papyrus_mask_factor = config.cube_config.factor
 zyx = config.cube_config.zyx
 z = config.cube_config.z
 y = config.cube_config.y
@@ -39,15 +36,21 @@ z_num = int(z)
 y_num = int(y)
 x_num = int(x)
 
-if scroll_name == 's1' and not data_manager.is_valid_coord_s1([z_num, y_num, x_num]):
+if scroll_name == 's1' and not is_valid_coord_s1([z_num, y_num, x_num]):
     print(f"Invalid coordinates: {z_num}, {y_num}, {x_num}")
-    z_num = data_manager.find_nearest_valid_coord(z_num)
-    y_num = data_manager.find_nearest_valid_coord(y_num)
-    x_num = data_manager.find_nearest_valid_coord(x_num)
+    z_num = find_nearest_valid_coord(z_num)
+    y_num = find_nearest_valid_coord(y_num)
+    x_num = find_nearest_valid_coord(x_num)
     print(f"Using nearest valid coordinates: {z_num}, {y_num}, {x_num}")
     z = str(z_num).zfill(5)
     y = str(y_num).zfill(5)
     x = str(x_num).zfill(5)
+    config.cube_config.update_coordinates(z=z, y=y, x=x)
+
+data_manager = DataManager(config.cube_config)
+
+# Data location and size parameters
+papyrus_mask_factor = config.cube_config.factor
 
 chunk_size = config.cube_config.chunk_size
 global pad_amount
@@ -851,7 +854,7 @@ def dilate_labels(viewer):
     viewer.status = msg
     print(msg)
 
-async def save_labels_async(viewer, papyrus_labels, ink_labels, should_show_popup=True):
+async def save_labels_async(viewer, z,y,x, papyrus_labels, ink_labels, should_show_popup=True):
     msg = 'save labels'
     viewer.status = msg
     print(msg)
@@ -865,29 +868,29 @@ async def save_labels_async(viewer, papyrus_labels, ink_labels, should_show_popu
 
     # Save ink prediction data if it exists
     if ink_labels is not None:
-        tasks.append(data_manager.save_label_data_async(ink_labels, 'ink'))
+        tasks.append(data_manager.save_label_data_async(z,y,x, ink_labels, 'ink'))
 
     # Save papyrus label data
-    tasks.append(data_manager.save_label_data_async(papyrus_labels, 'vol'))
+    tasks.append(data_manager.save_label_data_async(z,y,x, papyrus_labels, 'vol'))
 
     # Save raw data if it hasn't been saved before
-    tasks.append(data_manager.save_raw_data_async())
+    tasks.append(data_manager.save_raw_data_async(z,y,x))
 
     # Wait for all save tasks to complete
     await asyncio.gather(*tasks)
 
-    output_path = data_manager.get_output_path()
+    output_path = data_manager.get_output_path(z,y,x)
     if should_show_popup:
         msg = f"Layers saved to {output_path}"
         show_popup(msg)
 
-def save_labels(viewer, papyrus_labels=None, ink_labels=None, should_show_popup=True):
+def save_labels(viewer, z,y,x, should_show_popup=True, papyrus_labels=None, ink_labels=None):
     if papyrus_labels is None:
-        papyrus_labels = viewer.layers['Papyrus Labels'].data
-    if ink_labels is None and 'Ink Labels' in viewer.layers:
-        ink_labels = viewer.layers['Ink Labels'].data
+        papyrus_labels = viewer.layers[papyrus_label_name].data
+    if ink_labels is None and ink_label_name in viewer.layers:
+        ink_labels = viewer.layers[ink_label_name].data
     
-    asyncio.ensure_future(save_labels_async(viewer, papyrus_labels, ink_labels, should_show_popup))
+    asyncio.ensure_future(save_labels_async(viewer,z,y,x, papyrus_labels, ink_labels, should_show_popup))
     if should_show_popup:
         show_popup("Saving has started. You will be notified when it's complete.")
 
@@ -934,10 +937,17 @@ def bind_hotkeys(viewer, hotkey_config, module=None, overwrite=True):
             except (ValueError, TypeError) as e:
                 print(f"Error binding key '{keys}' to function '{func_name}': {str(e)}")
 
-def update_and_reload_data(viewer, data_manager, config, z, y, x):
-    print(f"Updating coordinates to z={z}, y={y}, x={x}")
-    config.cube_config.update_coordinates(z, y, x)
-    data_manager.reload_data(z,y,x)
+def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x):
+    print(f"main fxn: Updating coordinates to z={new_z}, y={new_y}, x={new_x} from {config.cube_config.z}, {config.cube_config.y}, {config.cube_config.x}")
+    #this should be responsible for the saving
+    papyrus_labels = viewer.layers[papyrus_label_name].data
+    ink_labels = None
+    if ink_label_name in viewer.layers:
+        ink_labels = viewer.layers[ink_label_name].data
+    save_labels(viewer, config.cube_config.z, config.cube_config.y, config.cube_config.x, should_show_popup=False, papyrus_labels=papyrus_labels, ink_labels=ink_labels)
+    
+    config.cube_config.update_coordinates(new_z, new_y, new_x)
+    data_manager.reload_data()
 
     # Update the layers in the viewer
     viewer.layers[data_name].data = data_manager.raw_data
@@ -971,7 +981,7 @@ functions_dict = {
     'connected_components': connected_components,
     'save_labels': save_labels,
     'update_and_reload_data': lambda z, y, x: update_and_reload_data(viewer, data_manager, config, z, y, x),
-    'save_labels': lambda: save_labels(viewer, should_show_popup=False),
+    # 'save_labels_auto': lambda: save_labels(viewer),
 }
 
 def update_global_erase_slice_width(value):
@@ -980,7 +990,6 @@ def update_global_erase_slice_width(value):
     print(f"Global erase width updated to: {erase_slice_width}")
 
 # Create the GUI
-
 gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, config, config.cube_config.main_label_layer_name)
 gui.setup_napari_defaults(main_label_name)
 papyrus_label_layer.colormap = get_direct_label_colormap()

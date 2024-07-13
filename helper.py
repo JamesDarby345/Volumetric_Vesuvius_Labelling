@@ -14,6 +14,30 @@ from scipy.ndimage import gaussian_filter
 import yaml
 from pathlib import Path
 
+def find_nearest_valid_coord(num):
+        difference = num - 2000
+        quotient = difference // 256
+        remainder = difference % 256
+
+        if remainder == 0:
+            result = num
+        elif remainder > 128:
+            result = 2000 + 256 * (quotient + 1)
+        else:
+            result = 2000 + 256 * quotient
+        
+        return max(result, 208)
+
+def is_valid_coord_s1(num_or_list):
+    if isinstance(num_or_list, (int, float)):
+        difference = abs(num_or_list - 2000)
+        return difference % 256 == 0
+    elif isinstance(num_or_list, (list, np.ndarray)):
+        differences = np.abs(np.array(num_or_list) - 2000)
+        return (differences % 256 == 0).all()
+    else:
+        raise TypeError("Input must be a number, list, or numpy array")
+
 def read_config(config_path='napari_config.yaml'):
     config_path = Path(config_path)
     if config_path.exists():

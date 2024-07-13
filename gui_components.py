@@ -17,11 +17,12 @@ def pick_color(viewer):
         viewer.window._qt_viewer.canvas.bgcolor = color_tuple
 
 class ZYXNavigationWidget(QWidget):
-    def __init__(self, config, update_function, save_function):
+    def __init__(self, config, update_function, save_function, viewer):
         super().__init__()
         self.config = config
         self.update_function = update_function
         self.save_function = save_function
+        self.viewer = viewer
         self.setup_ui()
 
     def setup_ui(self):
@@ -50,19 +51,22 @@ class ZYXNavigationWidget(QWidget):
             axis_layout.addWidget(next_button)
             layout.addLayout(axis_layout)
 
-    def update_zyx(self):
-        new_zyx = self.zyx_input.text()
+    def update_zyx(self, new_zyx=None):
+        if new_zyx is None:
+            new_zyx = self.zyx_input.text()
         if self.validate_zyx(new_zyx):
-            self.save_function()
+            # Save current labels before updating
+            # papyrus_labels = np.copy(self.viewer.layers['Papyrus Labels'].data)
+            # ink_labels = np.copy(self.viewer.layers['Ink Labels'].data) if 'Ink Labels' in self.viewer.layers else None
+            # self.save_function(self.viewer, papyrus_labels=papyrus_labels, ink_labels=ink_labels, should_show_popup=False)
+            
             z, y, x = new_zyx.split('_')
             self.update_function(z, y, x)
+            self.zyx_input.setText(new_zyx)
         else:
             show_popup("Invalid ZYX format. Please use ZZZZZ_YYYYY_XXXXX.")
 
     def navigate_cube(self, axis, direction):
-        # Save current labels before navigating
-        self.save_function()
-        
         current_z = int(self.config.cube_config.z)
         current_y = int(self.config.cube_config.y)
         current_x = int(self.config.cube_config.x)
@@ -70,16 +74,25 @@ class ZYXNavigationWidget(QWidget):
 
         if axis == 'Z':
             new_z = current_z + (direction * chunk_size)
+            if new_z < 0:
+                show_popup("Cannot navigate to negative Z values.")
+                return
             new_zyx = f"{new_z:05d}_{current_y:05d}_{current_x:05d}"
         elif axis == 'Y':
             new_y = current_y + (direction * chunk_size)
+            if new_y < 0:
+                show_popup("Cannot navigate to negative Y values.")
+                return
             new_zyx = f"{current_z:05d}_{new_y:05d}_{current_x:05d}"
         elif axis == 'X':
             new_x = current_x + (direction * chunk_size)
+            if new_x < 0:
+                show_popup("Cannot navigate to negative X values.")
+                return
             new_zyx = f"{current_z:05d}_{current_y:05d}_{new_x:05d}"
 
-        self.zyx_input.setText(new_zyx)
-        self.update_zyx()
+        # self.zyx_input.setText(new_zyx)
+        self.update_zyx(new_zyx)
 
     @staticmethod
     def validate_zyx(zyx):
@@ -197,7 +210,7 @@ class VesuviusGUI:
 
     def setup_gui(self):
         # Create custom button widgets
-        self.zyx_widget = ZYXNavigationWidget(self.config, self.functions['update_and_reload_data'], self.functions['save_labels'])
+        self.zyx_widget = ZYXNavigationWidget(self.config, self.functions['update_and_reload_data'], self.functions['save_labels'], self.viewer)
         self.viewer.window.add_dock_widget(self.zyx_widget, area='left')
 
         self.dilate_button = CustomButtonWidget("Dilate Labels", self.get_key_string('dilate_labels'), self.dilate_labels_gui)
