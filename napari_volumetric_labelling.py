@@ -938,8 +938,13 @@ def bind_hotkeys(viewer, hotkey_config, module=None, overwrite=True):
                 print(f"Error binding key '{keys}' to function '{func_name}': {str(e)}")
 
 def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x):
+    if data_manager.is_saving:
+        show_popup("A save operation is in progress. Please wait a few seconds before navigating to a new cube.")
+        return False
+    
     print(f"main fxn: Updating coordinates to z={new_z}, y={new_y}, x={new_x} from {config.cube_config.z}, {config.cube_config.y}, {config.cube_config.x}")
-    #this should be responsible for the saving
+
+    # Save the current labels, before updating the coordinates
     papyrus_labels = viewer.layers[papyrus_label_name].data
     ink_labels = None
     if ink_label_name in viewer.layers:

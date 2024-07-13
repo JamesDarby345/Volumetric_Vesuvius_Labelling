@@ -55,14 +55,11 @@ class ZYXNavigationWidget(QWidget):
         if new_zyx is None:
             new_zyx = self.zyx_input.text()
         if self.validate_zyx(new_zyx):
-            # Save current labels before updating
-            # papyrus_labels = np.copy(self.viewer.layers['Papyrus Labels'].data)
-            # ink_labels = np.copy(self.viewer.layers['Ink Labels'].data) if 'Ink Labels' in self.viewer.layers else None
-            # self.save_function(self.viewer, papyrus_labels=papyrus_labels, ink_labels=ink_labels, should_show_popup=False)
-            
             z, y, x = new_zyx.split('_')
-            self.update_function(z, y, x)
-            self.zyx_input.setText(new_zyx)
+            
+            #only update coord text if update is successful
+            if self.update_function(z, y, x):
+                self.zyx_input.setText(new_zyx)
         else:
             show_popup("Invalid ZYX format. Please use ZZZZZ_YYYYY_XXXXX.")
 

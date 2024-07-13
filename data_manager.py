@@ -22,6 +22,7 @@ class DataManager:
         self.label_header = None
         self.raw_data_zarr_shape = None
         self.nrrd_cube_path = self.config.nrrd_cube_path
+        self.is_saving = False
 
         self.load_data()
 
@@ -304,41 +305,45 @@ class DataManager:
     #         print(f"Raw data file already exists at {file_path}")
 
     async def save_label_data_async(self, z,y,x, data, label_type):
-        file_path = self.get_label_file_path(z,y,x, label_type)
-        
-        if label_type == 'vol':
-            header = self.label_header
-            if header is not None:
-                # Parse the existing timestamps
-                if 'saved_timestamps' in header:
-                    try:
-                        saved_timestamps = ast.literal_eval(header['saved_timestamps'])
-                    except:
+        self.is_saving = True
+        try:
+            file_path = self.get_label_file_path(z,y,x, label_type)
+            
+            if label_type == 'vol':
+                header = self.label_header
+                if header is not None:
+                    # Parse the existing timestamps
+                    if 'saved_timestamps' in header:
+                        try:
+                            saved_timestamps = ast.literal_eval(header['saved_timestamps'])
+                        except:
+                            saved_timestamps = []
+                    else:
                         saved_timestamps = []
-                else:
-                    saved_timestamps = []
-                
-                # Append the new timestamp
-                saved_timestamps.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                
-                # Update the header with the new list of timestamps
-                header['saved_timestamps'] = str(saved_timestamps)
-                
-                # Do the same for open_timestamps
-                if 'open_timestamps' in header:
-                    try:
-                        open_timestamps = ast.literal_eval(header['open_timestamps'])
-                    except:
+                    
+                    # Append the new timestamp
+                    saved_timestamps.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                    
+                    # Update the header with the new list of timestamps
+                    header['saved_timestamps'] = str(saved_timestamps)
+                    
+                    # Do the same for open_timestamps
+                    if 'open_timestamps' in header:
+                        try:
+                            open_timestamps = ast.literal_eval(header['open_timestamps'])
+                        except:
+                            open_timestamps = []
+                    else:
                         open_timestamps = []
-                else:
-                    open_timestamps = []
-                header['open_timestamps'] = str(open_timestamps)
-                
-                header = dict(header)
-        else:
-            header = None
+                    header['open_timestamps'] = str(open_timestamps)
+                    
+                    header = dict(header)
+            else:
+                header = None
 
-        await self._save_nrrd_async(file_path, data, header)
+            await self._save_nrrd_async(file_path, data, header)
+        finally: 
+            self.is_saving = False
 
     async def save_raw_data_async(self,z,y,x):
         file_path = self.get_raw_data_file_path(z,y,x)
