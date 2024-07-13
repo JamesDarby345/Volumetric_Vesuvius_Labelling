@@ -17,10 +17,11 @@ Watch the tutorial video on how to use available here: https://dl.ash2txt.org/co
 ## Install with conda & setup instructions:
 
 ```
-conda create --name napari_vesuvius
+conda env create -f environment.yml
 conda activate napari_vesuvius
-pip install -r requirements.txt
 ```
+
+
 Create a /data/nrrd_cubes/s1 folder in the repository to put the nrrd cubes from the download server into. The s1 is the scroll_name value in the config, it can be changed to keep seperate scroll cubes apart. Link to location of s1 cubes on the Vesuvius download server: https://dl.ash2txt.org/full-scrolls/Scroll1/PHercParis4.volpkg/seg-volumetric-labels/cubes_renamed/
 
 Copy the napari_config.yaml file and rename it local_napari_config.yaml

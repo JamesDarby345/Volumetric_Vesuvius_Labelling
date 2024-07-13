@@ -1,0 +1,23 @@
+name: napari_t
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python
+  - napari=0.4.19
+  - numpy
+  - zarr
+  - scikit-image
+  - scipy
+  - matplotlib
+  - jupyter
+  - ipykernel
+  - scikit-learn
+  - pyqt
+  - numba
+  - pip
+  - pip:
+    - pynrrd
+    - napari-threedee
+    - qasync
+    - blosc2
