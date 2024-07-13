@@ -94,6 +94,10 @@ class CubeConfig:
     @property
     def x_num(self):
         return int(self.x)
+    
+    @property
+    def create_papyrus_mask_if_not_provided(self):
+        return self.cube_info.get('create_papyrus_mask_if_not_provided', True)
 
     @property
     def scroll_name(self):

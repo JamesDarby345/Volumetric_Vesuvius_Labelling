@@ -307,7 +307,7 @@ class VesuviusGUI:
         self.functions['connected_components'](self.viewer)
 
     def save_labels_button(self):
-        self.functions['save_labels'](self.viewer)
+        self.functions['save_labels'](self.viewer, self.config.cube_config.z, self.config.cube_config.y, self.config.cube_config.x)
 
     def get_instruction_text(self):
         def key_to_string(key):

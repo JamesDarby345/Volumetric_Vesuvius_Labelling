@@ -87,14 +87,15 @@ erase_mode = False
 global erase_slice_width
 erase_slice_width = 30
 
-if main_label_layer_name != 'ink' or ink_pred_data is None:
+if (main_label_layer_name != 'ink' and label_data is not None) or ink_pred_data is None:
     main_label_name = papyrus_label_name
 else: 
     main_label_name = ink_label_name
 
 # Add the 3D data to the viewer
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
-papyrus_label_layer = viewer.add_labels(label_data, name=papyrus_label_name)
+if label_data is not None:
+    papyrus_label_layer = viewer.add_labels(label_data, name=papyrus_label_name)
 if ink_pred_data is not None:
     ink_labels_layer = viewer.add_labels(ink_pred_data, name=ink_label_name)
 
@@ -210,10 +211,13 @@ def flood_fill(viewer, distance=20):
     cursor_position = tuple(int(np.round(coord)) for coord in cursor_position)
 
     # Get the current labels layer
-    papyrus_label_layer = viewer.layers[papyrus_label_name]
+    if papyrus_label_layer in viewer.layers:
+        label_layer = viewer.layers[papyrus_label_name]
+    elif ink_labels_layer in viewer.layers:
+        label_layer = viewer.layers[ink_label_name]
 
     # Get the current labels
-    labels = papyrus_label_layer.data
+    labels = label_layer.data
 
     # Perform the flood fill operation
     flood_fill_result = limited_bfs_flood_fill(labels, cursor_position, distance)
@@ -718,7 +722,7 @@ def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
 def connected_components(viewer, preview=False, cc_layer_name=main_label_name):
     global erase_mode, cut_side
 
-    if not preview and viewer.layers[main_label_name].data is not None and ink_pred_data is not None:
+    if not preview and viewer.layers[main_label_name].data is not None and ink_pred_data is not None and label_data is not None:
         cc_layer_name = select_from_list_popup("Connected Components", "Select the layer to apply connected components to", [papyrus_label_name, ink_label_name])
     if not preview:
         msg = "DANGER Are you sure you want to run connected components? This operation cannot be undone and removes the undo queue. Consider saving first. \n\nIF YOU HAVE DILATED SEPERATED LABELS AND THEY NOW TOUCH, THEY WILL BE COMBINED."
@@ -854,12 +858,12 @@ def dilate_labels(viewer):
     viewer.status = msg
     print(msg)
 
-async def save_labels_async(viewer, z,y,x, papyrus_labels, ink_labels, should_show_popup=True):
+async def save_labels_async(viewer, z=config.cube_config.z, y=config.cube_config.y ,x=config.cube_config.x, papyrus_labels=None, ink_labels=None, should_show_popup=True):
     msg = 'save labels'
     viewer.status = msg
     print(msg)
 
-    if papyrus_labels.shape[0] != config.cube_config.chunk_size:
+    if papyrus_label_name in viewer.layers and papyrus_labels.shape[0] != config.cube_config.chunk_size:
         msg = "please remove additional context padding before saving"
         show_popup(msg)
         return
@@ -871,7 +875,8 @@ async def save_labels_async(viewer, z,y,x, papyrus_labels, ink_labels, should_sh
         tasks.append(data_manager.save_label_data_async(z,y,x, ink_labels, 'ink'))
 
     # Save papyrus label data
-    tasks.append(data_manager.save_label_data_async(z,y,x, papyrus_labels, 'vol'))
+    if papyrus_labels is not None:
+        tasks.append(data_manager.save_label_data_async(z,y,x, papyrus_labels, 'vol'))
 
     # Save raw data if it hasn't been saved before
     tasks.append(data_manager.save_raw_data_async(z,y,x))
@@ -884,8 +889,8 @@ async def save_labels_async(viewer, z,y,x, papyrus_labels, ink_labels, should_sh
         msg = f"Layers saved to {output_path}"
         show_popup(msg)
 
-def save_labels(viewer, z,y,x, should_show_popup=True, papyrus_labels=None, ink_labels=None):
-    if papyrus_labels is None:
+def save_labels(viewer, z=config.cube_config.z, y=config.cube_config.y ,x=config.cube_config.x, should_show_popup=True, papyrus_labels=None, ink_labels=None):
+    if papyrus_labels is None and papyrus_label_name in viewer.layers:
         papyrus_labels = viewer.layers[papyrus_label_name].data
     if ink_labels is None and ink_label_name in viewer.layers:
         ink_labels = viewer.layers[ink_label_name].data
@@ -945,7 +950,9 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x):
     print(f"main fxn: Updating coordinates to z={new_z}, y={new_y}, x={new_x} from {config.cube_config.z}, {config.cube_config.y}, {config.cube_config.x}")
 
     # Save the current labels, before updating the coordinates
-    papyrus_labels = viewer.layers[papyrus_label_name].data
+    papyrus_labels = None
+    if papyrus_label_name in viewer.layers:
+        papyrus_labels = viewer.layers[papyrus_label_name].data
     ink_labels = None
     if ink_label_name in viewer.layers:
         ink_labels = viewer.layers[ink_label_name].data
@@ -956,15 +963,22 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x):
 
     # Update the layers in the viewer
     viewer.layers[data_name].data = data_manager.raw_data
-    viewer.layers[papyrus_label_name].data = data_manager.original_label_data
+    if data_manager.original_label_data is not None:
+        if papyrus_label_name in viewer.layers:
+            viewer.layers[papyrus_label_name].data = data_manager.original_label_data
+        else:
+            viewer.add_labels(data_manager.original_label_data, name=papyrus_label_name)
+    elif papyrus_label_name in viewer.layers:
+        viewer.layers.remove(papyrus_label_name)
+
     if data_manager.original_ink_pred_data is not None:
         if ink_label_name in viewer.layers:
             viewer.layers[ink_label_name].data = data_manager.original_ink_pred_data
         else:
             viewer.add_labels(data_manager.original_ink_pred_data, name=ink_label_name)
-    else:
-        if ink_label_name in viewer.layers:
+    elif ink_label_name in viewer.layers:
             viewer.layers.remove(ink_label_name)
+
     if label_3d_name in viewer.layers:
         viewer.layers.remove(label_3d_name)
     if cc_preview_name in viewer.layers:
@@ -973,7 +987,8 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x):
         viewer.layers.remove(ff_name)
 
     # Update the ZYX input in the GUI
-    gui.zyx_widget.zyx_input.setText(f"{z}_{y}_{x}")
+    print(f"Updating ZYX input in GUI to {new_z}, {new_y}, {new_x}")
+    gui.zyx_widget.zyx_input.setText(f"{new_z}_{new_y}_{new_x}")
 
 # Create a dictionary of functions to pass to the GUI
 functions_dict = {
@@ -997,14 +1012,13 @@ def update_global_erase_slice_width(value):
 # Create the GUI
 gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, config, config.cube_config.main_label_layer_name)
 gui.setup_napari_defaults(main_label_name)
-papyrus_label_layer.colormap = get_direct_label_colormap()
+if papyrus_label_name in viewer.layers:
+    papyrus_label_layer.colormap = get_direct_label_colormap()
 
 bind_hotkeys(viewer, config.hotkey_config)
 set_camera_view(viewer)
 setup_brush_size_listener(viewer, main_label_name)
 
-# Add the threedee plugin dock widgets if using ink prediction data
-# if ink_pred_data is not None:
 try:
     viewer.window.add_plugin_dock_widget(
         plugin_name="napari-threedee", widget_name="render plane manipulator"

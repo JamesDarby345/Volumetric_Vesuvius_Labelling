@@ -75,7 +75,7 @@ class DataManager:
         elif os.path.exists(mask_file_path):
             print(f"Loading label data from provided mask {mask_file_path}")
             self.original_label_data, self.label_header = nrrd.read(mask_file_path)
-        else:
+        elif self.config.create_papyrus_mask_if_not_provided:
             self.original_label_data = self.threshold_mask(self.raw_data, factor=self.config.factor).astype(np.uint8)
             os.makedirs(nrrd_cube_folder_path, exist_ok=True)
             print("Creating Papyrus Label from thresholded raw data, may take a few seconds...")
@@ -238,16 +238,6 @@ class DataManager:
     @staticmethod
     def ensure_list(item):
         return item if isinstance(item, list) else [item]
-        # if isinstance(value, list):
-        #     return value
-        # if isinstance(value, str):
-        #     try:
-        #         # Try to parse the string as a list
-        #         return ast.literal_eval(value)
-        #     except (ValueError, SyntaxError):
-        #         # If it's not a valid list representation, wrap it in a list
-        #         return [value]
-        # return [value] if value is not None else []
 
     @staticmethod
     def get_transpose_params_from_shapes(shape1, shape2):
@@ -274,35 +264,6 @@ class DataManager:
         threshold = np.percentile(flat_data, 99.5)
         mask = data > threshold
         return mask
-
-    # def save_label_data(self, label_data, label_type='vol'):
-    #     output_folder_path = os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.config.scroll_name}')
-    #     file_path = os.path.join(output_folder_path, 
-    #                              f"{self.config.z}_{self.config.y}_{self.config.x}",
-    #                              f"{self.config.z}_{self.config.y}_{self.config.x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_{label_type}_label.nrrd")
-        
-    #     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        
-    #     if label_type == 'vol' and self.label_header is not None:
-    #         self.label_header['saved_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    #         nrrd.write(file_path, label_data, header=dict(self.label_header))
-    #     else:
-    #         nrrd.write(file_path, label_data)
-        
-    #     print(f"Saved {label_type} label to {file_path}")
-
-    # def save_raw_data(self):
-    #     output_folder_path = os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.config.scroll_name}')
-    #     file_path = os.path.join(output_folder_path, 
-    #                              f"{self.config.z}_{self.config.y}_{self.config.x}",
-    #                              f"{self.config.z}_{self.config.y}_{self.config.x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_vol_raw.nrrd")
-        
-    #     if not os.path.exists(file_path):
-    #         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    #         nrrd.write(file_path, self.raw_data)
-    #         print(f"Saved raw data to {file_path}")
-    #     else:
-    #         print(f"Raw data file already exists at {file_path}")
 
     async def save_label_data_async(self, z,y,x, data, label_type):
         self.is_saving = True
