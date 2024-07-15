@@ -11,30 +11,31 @@ from scipy.ndimage import gaussian_filter
 from skimage.morphology import remove_small_objects, remove_small_holes
 import asyncio
 import ast
+from helper import *
 
 class DataManager:
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, cube_config):
+        self.cube_config = cube_config
         self.raw_data = None
         self.padded_raw_data = None
         self.original_label_data = None
         self.original_ink_pred_data = None
         self.label_header = None
         self.raw_data_zarr_shape = None
-        self.nrrd_cube_path = self.config.nrrd_cube_path
+        self.nrrd_cube_path = self.cube_config.nrrd_cube_path
         self.is_saving = False
 
         self.load_data()
 
     def reload_data(self):
-        print(f"Reloading data in data manager {self.config.z}_{self.config.y}_{self.config.x}")
+        print(f"Reloading data in data manager {self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}")
         # Reset all data attributes
         self.raw_data = None
         self.padded_raw_data = None
         self.original_label_data = None
         self.original_ink_pred_data = None
         self.label_header = None
-        self.nrrd_cube_path = self.config.nrrd_cube_path
+        self.nrrd_cube_path = self.cube_config.nrrd_cube_path
 
         # Reload all data
         self.load_data()
@@ -46,28 +47,28 @@ class DataManager:
             
 
     def load_raw_data(self):
-        if not self.config.using_raw_data_zarr:
-            volume_file_path = os.path.join(self.config.nrrd_cube_path, 
-                                            f'{self.config.z}_{self.config.y}_{self.config.x}', 
-                                            f'{self.config.z}_{self.config.y}_{self.config.x}_volume.nrrd')
+        if not self.cube_config.using_raw_data_zarr:
+            volume_file_path = os.path.join(self.cube_config.nrrd_cube_path, 
+                                            f'{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}', 
+                                            f'{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}_volume.nrrd')
             self.raw_data, _ = nrrd.read(volume_file_path)
             self.padded_raw_data = self.get_padded_nrrd_data()
         else:
-            raw_data_zarr_multi_res = zarr.open(self.config.raw_data_zarr_path, mode='r')
+            raw_data_zarr_multi_res = zarr.open(self.cube_config.raw_data_zarr_path, mode='r')
             self.raw_data_zarr_shape = raw_data_zarr_multi_res[0].shape
-            self.raw_data = raw_data_zarr_multi_res[0][self.config.z_num:self.config.z_num+self.config.chunk_size, 
-                                                       self.config.y_num:self.config.y_num+self.config.chunk_size, 
-                                                       self.config.x_num:self.config.x_num+self.config.chunk_size]
+            self.raw_data = raw_data_zarr_multi_res[0][self.cube_config.z_num:self.cube_config.z_num+self.cube_config.chunk_size, 
+                                                       self.cube_config.y_num:self.cube_config.y_num+self.cube_config.chunk_size, 
+                                                       self.cube_config.x_num:self.cube_config.x_num+self.cube_config.chunk_size]
             self.padded_raw_data = self.get_padded_data_zarr(raw_data_zarr_multi_res[0])
 
     def load_label_data(self):
-        output_folder_path = os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.config.scroll_name}')
+        output_folder_path = os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.cube_config.scroll_name}')
         saved_label_file_path = os.path.join(output_folder_path, 
-                                             f"{self.config.z}_{self.config.y}_{self.config.x}",
-                                             f"{self.config.z}_{self.config.y}_{self.config.x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_vol_label.nrrd")
+                                             f"{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}",
+                                             f"{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}_zyx_{self.cube_config.chunk_size}_chunk_{self.cube_config.scroll_name}_vol_label.nrrd")
 
-        nrrd_cube_folder_path = os.path.join(self.config.nrrd_cube_path, f'{self.config.z}_{self.config.y}_{self.config.x}')
-        mask_file_path = os.path.join(nrrd_cube_folder_path, f'{self.config.z}_{self.config.y}_{self.config.x}_mask.nrrd')
+        nrrd_cube_folder_path = os.path.join(self.cube_config.nrrd_cube_path, f'{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}')
+        mask_file_path = os.path.join(nrrd_cube_folder_path, f'{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}_mask.nrrd')
 
         if os.path.exists(saved_label_file_path):
             print(f"Loading label data from saved label {saved_label_file_path}")
@@ -75,8 +76,8 @@ class DataManager:
         elif os.path.exists(mask_file_path):
             print(f"Loading label data from provided mask {mask_file_path}")
             self.original_label_data, self.label_header = nrrd.read(mask_file_path)
-        elif self.config.create_papyrus_mask_if_not_provided:
-            self.original_label_data = self.threshold_mask(self.raw_data, factor=self.config.factor).astype(np.uint8)
+        elif self.cube_config.create_papyrus_mask_if_not_provided:
+            self.original_label_data = self.threshold_mask(self.raw_data, factor=self.cube_config.factor).astype(np.uint8)
             os.makedirs(nrrd_cube_folder_path, exist_ok=True)
             print("Creating Papyrus Label from thresholded raw data, may take a few seconds...")
             nrrd.write(mask_file_path, self.original_label_data)
@@ -88,35 +89,41 @@ class DataManager:
             for key in ['saved_timestamps', 'open_timestamps']:
                 self.label_header[key] = self.ensure_list(self.label_header[key])
             self.label_header['open_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            if 'author' not in self.label_header and self.config.author is not None and self.config.author != '':
-                self.label_header['author'] = self.config.author
+            if 'author' not in self.label_header and self.cube_config.author is not None and self.cube_config.author != '':
+                self.label_header['author'] = self.cube_config.author
+
+        if self.cube_config.smoother_labels and self.original_label_data is not None:
+            self.original_label_data = pad_array(self.original_label_data, self.cube_config.chunk_size)
 
     def load_ink_pred_data(self):
         saved_ink_pred_file_path = os.path.join(os.getcwd(), 'output', 
-                                                f'volumetric_labels_{self.config.scroll_name}', 
-                                                f"{self.config.z}_{self.config.y}_{self.config.x}",
-                                                f"{self.config.z}_{self.config.y}_{self.config.x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_ink_label.nrrd")
+                                                f'volumetric_labels_{self.cube_config.scroll_name}', 
+                                                f"{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}",
+                                                f"{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}_zyx_{self.cube_config.chunk_size}_chunk_{self.cube_config.scroll_name}_ink_label.nrrd")
 
         if os.path.exists(saved_ink_pred_file_path):
             self.original_ink_pred_data, _ = nrrd.read(saved_ink_pred_file_path)
-        elif self.config.using_ink_pred_zarr:
-            ink_pred_zarr = zarr.open(self.config.ink_pred_zarr_path, mode='r')
+        elif self.cube_config.using_ink_pred_zarr:
+            ink_pred_zarr = zarr.open(self.cube_config.ink_pred_zarr_path, mode='r')
             ink_pred_dask = da.from_zarr(ink_pred_zarr)
 
-            if self.config.raw_data_axis_order is None or self.config.ink_pred_label_axis_order is None and self.raw_data_zarr_shape is not None:
+            if self.cube_config.raw_data_axis_order is None or self.cube_config.ink_pred_label_axis_order is None and self.raw_data_zarr_shape is not None:
                 transpose_params = self.get_transpose_params_from_shapes(self.raw_data_zarr_shape, ink_pred_dask.shape) 
                 ink_pred_dask = ink_pred_dask.transpose(transpose_params)
-            elif self.config.raw_data_axis_order is not None and self.config.ink_pred_label_axis_order is not None:
-                transpose_params = self.get_transpose_params_from_axis_order(self.config.raw_data_axis_order, self.config.ink_pred_label_axis_order)
+            elif self.cube_config.raw_data_axis_order is not None and self.cube_config.ink_pred_label_axis_order is not None:
+                transpose_params = self.get_transpose_params_from_axis_order(self.cube_config.raw_data_axis_order, self.cube_config.ink_pred_label_axis_order)
                 ink_pred_dask = ink_pred_dask.transpose(transpose_params)
             else:
                 print("Could not ensure alignment of ink prediction label with raw data, using default axis order. Please check the axis order of the raw data and ink prediction label and set it in the config file if incorrect")
             
-            ink_pred_region = ink_pred_dask[self.config.z_num:self.config.z_num+self.config.chunk_size, 
-                                            self.config.y_num:self.config.y_num+self.config.chunk_size, 
-                                            self.config.x_num:self.config.x_num+self.config.chunk_size]
-            thresholded_data = np.array(da.where(ink_pred_region < self.config.ink_threshold, 0, 1)).astype(np.uint8)
+            ink_pred_region = ink_pred_dask[self.cube_config.z_num:self.cube_config.z_num+self.cube_config.chunk_size, 
+                                            self.cube_config.y_num:self.cube_config.y_num+self.cube_config.chunk_size, 
+                                            self.cube_config.x_num:self.cube_config.x_num+self.cube_config.chunk_size]
+            thresholded_data = np.array(da.where(ink_pred_region < self.cube_config.ink_threshold, 0, 1)).astype(np.uint8)
             self.original_ink_pred_data = thresholded_data
+
+        if self.cube_config.smoother_labels and self.original_ink_pred_data is not None:
+            self.original_ink_pred_data = pad_array(self.original_ink_pred_data, self.cube_config.chunk_size)
 
     def get_padded_nrrd_data(self):
         padded_raw_data = None
@@ -134,16 +141,16 @@ class DataManager:
             (1, 1, -1),   (1, 1, 0),   (1, 1, 1)
         ]
         
-        padded_size = self.config.chunk_size + 2 * self.config.pad_amount
+        padded_size = self.cube_config.chunk_size + 2 * self.cube_config.pad_amount
         padded_raw_data = np.zeros((padded_size, padded_size, padded_size))
         
         for dz, dy, dx in neighbors:
-            neighbor_z = str(int(self.config.z) + dz * self.config.chunk_size).zfill(5)
-            neighbor_y = str(int(self.config.y) + dy * self.config.chunk_size).zfill(5)
-            neighbor_x = str(int(self.config.x) + dx * self.config.chunk_size).zfill(5)
+            neighbor_z = str(int(self.cube_config.z) + dz * self.cube_config.chunk_size).zfill(5)
+            neighbor_y = str(int(self.cube_config.y) + dy * self.cube_config.chunk_size).zfill(5)
+            neighbor_x = str(int(self.cube_config.x) + dx * self.cube_config.chunk_size).zfill(5)
             
             filename = f"{neighbor_z}_{neighbor_y}_{neighbor_x}/{neighbor_z}_{neighbor_y}_{neighbor_x}_volume.nrrd"
-            filepath = os.path.join(self.config.nrrd_cube_path, filename)
+            filepath = os.path.join(self.cube_config.nrrd_cube_path, filename)
             
             if os.path.exists(filepath):
                 try:
@@ -152,24 +159,24 @@ class DataManager:
                     print(f"An error occurred while reading {filepath}: {e}")
                     continue
                 
-                z_start = self.config.chunk_size - self.config.pad_amount if dz < 0 else 0
-                z_end = self.config.pad_amount if dz > 0 else self.config.chunk_size
-                y_start = self.config.chunk_size - self.config.pad_amount if dy < 0 else 0
-                y_end = self.config.pad_amount if dy > 0 else self.config.chunk_size
-                x_start = self.config.chunk_size - self.config.pad_amount if dx < 0 else 0
-                x_end = self.config.pad_amount if dx > 0 else self.config.chunk_size
+                z_start = self.cube_config.chunk_size - self.cube_config.pad_amount if dz < 0 else 0
+                z_end = self.cube_config.pad_amount if dz > 0 else self.cube_config.chunk_size
+                y_start = self.cube_config.chunk_size - self.cube_config.pad_amount if dy < 0 else 0
+                y_end = self.cube_config.pad_amount if dy > 0 else self.cube_config.chunk_size
+                x_start = self.cube_config.chunk_size - self.cube_config.pad_amount if dx < 0 else 0
+                x_end = self.cube_config.pad_amount if dx > 0 else self.cube_config.chunk_size
 
                 extracted_data = data[z_start:z_end, y_start:y_end, x_start:x_end]
                 
-                z_pad_start = self.config.pad_amount + (dz) * self.config.pad_amount
+                z_pad_start = self.cube_config.pad_amount + (dz) * self.cube_config.pad_amount
                 if dz == 1:
-                    z_pad_start = self.config.pad_amount + self.config.chunk_size
-                y_pad_start = self.config.pad_amount + (dy) * self.config.pad_amount
+                    z_pad_start = self.cube_config.pad_amount + self.cube_config.chunk_size
+                y_pad_start = self.cube_config.pad_amount + (dy) * self.cube_config.pad_amount
                 if dy == 1:
-                    y_pad_start = self.config.pad_amount + self.config.chunk_size
-                x_pad_start = self.config.pad_amount + (dx) * self.config.pad_amount
+                    y_pad_start = self.cube_config.pad_amount + self.cube_config.chunk_size
+                x_pad_start = self.cube_config.pad_amount + (dx) * self.cube_config.pad_amount
                 if dx == 1:
-                    x_pad_start = self.config.pad_amount + self.config.chunk_size
+                    x_pad_start = self.cube_config.pad_amount + self.cube_config.chunk_size
                 
                 z_pad_end = z_pad_start + extracted_data.shape[0]
                 y_pad_end = y_pad_start + extracted_data.shape[1]
@@ -188,21 +195,21 @@ class DataManager:
 
     def get_padded_data_zarr(self, zarr_arr):
         z_shape, y_shape, x_shape = zarr_arr.shape
-        output_size = self.config.chunk_size + 2 * self.config.pad_amount
+        output_size = self.cube_config.chunk_size + 2 * self.cube_config.pad_amount
         padded_raw_data = np.zeros((output_size, output_size, output_size))
 
-        z_start = max(0, self.config.z_num - self.config.pad_amount)
-        z_end = min(z_shape, self.config.z_num + self.config.chunk_size + self.config.pad_amount)
-        y_start = max(0, self.config.y_num - self.config.pad_amount)
-        y_end = min(y_shape, self.config.y_num + self.config.chunk_size + self.config.pad_amount)
-        x_start = max(0, self.config.x_num - self.config.pad_amount)
-        x_end = min(x_shape, self.config.x_num + self.config.chunk_size + self.config.pad_amount)
+        z_start = max(0, self.cube_config.z_num - self.cube_config.pad_amount)
+        z_end = min(z_shape, self.cube_config.z_num + self.cube_config.chunk_size + self.cube_config.pad_amount)
+        y_start = max(0, self.cube_config.y_num - self.cube_config.pad_amount)
+        y_end = min(y_shape, self.cube_config.y_num + self.cube_config.chunk_size + self.cube_config.pad_amount)
+        x_start = max(0, self.cube_config.x_num - self.cube_config.pad_amount)
+        x_end = min(x_shape, self.cube_config.x_num + self.cube_config.chunk_size + self.cube_config.pad_amount)
 
         raw_data = zarr_arr[z_start:z_end, y_start:y_end, x_start:x_end]
 
-        z_out_start = max(0, self.config.pad_amount - (self.config.z_num - z_start))
-        y_out_start = max(0, self.config.pad_amount - (self.config.y_num - y_start))
-        x_out_start = max(0, self.config.pad_amount - (self.config.x_num - x_start))
+        z_out_start = max(0, self.cube_config.pad_amount - (self.cube_config.z_num - z_start))
+        y_out_start = max(0, self.cube_config.pad_amount - (self.cube_config.y_num - y_start))
+        x_out_start = max(0, self.cube_config.pad_amount - (self.cube_config.x_num - x_start))
 
         padded_raw_data[
             z_out_start:z_out_start + (z_end - z_start),
@@ -322,12 +329,12 @@ class DataManager:
 
     def get_label_file_path(self,z,y,x, label_type):
         return os.path.join(self.get_output_path(z,y,x), 
-                            f"{z}_{y}_{x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_{label_type}_label.nrrd")
+                            f"{z}_{y}_{x}_zyx_{self.cube_config.chunk_size}_chunk_{self.cube_config.scroll_name}_{label_type}_label.nrrd")
 
     def get_raw_data_file_path(self,z,y,x,):
         return os.path.join(self.get_output_path(z,y,x), 
-                            f"{z}_{y}_{x}_zyx_{self.config.chunk_size}_chunk_{self.config.scroll_name}_vol_raw.nrrd")
+                            f"{z}_{y}_{x}_zyx_{self.cube_config.chunk_size}_chunk_{self.cube_config.scroll_name}_vol_raw.nrrd")
 
     def get_output_path(self, z,y,x):
-        return os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.config.scroll_name}', 
+        return os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.cube_config.scroll_name}', 
                             f'{z}_{y}_{x}')

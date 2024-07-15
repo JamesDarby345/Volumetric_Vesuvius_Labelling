@@ -97,8 +97,12 @@ else:
 # Add the 3D data to the viewer
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
 if label_data is not None:
+    # if config.cube_config.smoother_labels:
+    #     label_data = pad_array(label_data, config.cube_config.chunk_size)
     papyrus_label_layer = viewer.add_labels(label_data, name=papyrus_label_name)
 if ink_pred_data is not None:
+    # if config.cube_config.smoother_labels:
+    #     ink_pred_data = pad_array(ink_pred_data, config.cube_config.chunk_size)
     ink_labels_layer = viewer.add_labels(ink_pred_data, name=ink_label_name)
 
 @magicgui.magicgui
@@ -875,19 +879,25 @@ async def save_labels_async(viewer, z=config.cube_config.z, y=config.cube_config
     viewer.status = msg
     print(msg)
 
-    if papyrus_label_name in viewer.layers and papyrus_labels.shape[0] != config.cube_config.chunk_size:
-        msg = "please remove additional context padding before saving"
-        show_popup(msg)
-        return
+    # if papyrus_label_name in viewer.layers and papyrus_labels.shape[0] != config.cube_config.chunk_size:
+    #     msg = f"please remove additional context padding before saving, {papyrus_labels.shape}"
+    #     show_popup(msg)
+    #     return
 
     tasks = []
 
     # Save ink prediction data if it exists
     if ink_labels is not None:
+        if ink_labels.shape[0] != config.cube_config.chunk_size:
+            ink_labels = unpad_array(ink_labels, config.cube_config.chunk_size)
         tasks.append(data_manager.save_label_data_async(z,y,x, ink_labels, 'ink'))
 
     # Save papyrus label data
     if papyrus_labels is not None:
+        print(f"papyrus_labels shape: {papyrus_labels.shape}")
+        if papyrus_labels.shape[0] != config.cube_config.chunk_size:
+            papyrus_labels = unpad_array(papyrus_labels, config.cube_config.chunk_size)
+        print(f"papyrus_labels shape after unpad: {papyrus_labels.shape}")
         tasks.append(data_manager.save_label_data_async(z,y,x, papyrus_labels, 'vol'))
 
     # Save raw data if it hasn't been saved before
@@ -906,7 +916,7 @@ def save_labels(viewer, z=config.cube_config.z, y=config.cube_config.y ,x=config
         papyrus_labels = viewer.layers[papyrus_label_name].data
     if ink_labels is None and ink_label_name in viewer.layers:
         ink_labels = viewer.layers[ink_label_name].data
-    
+
     asyncio.ensure_future(save_labels_async(viewer,z,y,x, papyrus_labels, ink_labels, should_show_popup))
     if should_show_popup:
         show_popup("Saving has started. You will be notified when it's complete.")
