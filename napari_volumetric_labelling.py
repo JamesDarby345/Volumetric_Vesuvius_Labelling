@@ -18,6 +18,7 @@ from qasync import QEventLoop, QApplication
 from data_manager import DataManager
 from config import Config  # Assuming you create a Config class
 import warnings
+import magicgui
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
 warnings.filterwarnings("ignore", message="Contours are not displayed during 3D rendering")
@@ -65,6 +66,7 @@ pad_state = False
 
 data = data_manager.raw_data
 label_data = data_manager.original_label_data
+# label_data = np.pad(label_data, 1, mode='constant', constant_values=0)
 ink_pred_data = data_manager.original_ink_pred_data
 
 # Initialize the Napari viewer
@@ -98,6 +100,13 @@ if label_data is not None:
     papyrus_label_layer = viewer.add_labels(label_data, name=papyrus_label_name)
 if ink_pred_data is not None:
     ink_labels_layer = viewer.add_labels(ink_pred_data, name=ink_label_name)
+
+@magicgui.magicgui
+def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labels):
+    if viewer.dims.ndisplay != 3:
+        return
+    node = viewer.window.qt_viewer.layer_to_visual[layer].node
+    node.iso_gradient = not node.iso_gradient
 
 # Functions:
 def align_plane_with_selected_label(viewer):
@@ -512,6 +521,9 @@ def setup_label_3d_layer(viewer, new_label_data, active_mode):
     new_label_layer.opacity = 1
     new_label_layer.mode = active_mode
     new_label_layer.brush_size = brush_size
+
+    if config.cube_config.smoother_labels:
+        toggle_smooth_labels(viewer, new_label_layer)
 
     # Apply translation if pad_state is True
     if pad_state:
@@ -1032,6 +1044,15 @@ try:
     )
 except Exception as e:
     print(f"Error adding label annotator widget: {str(e)}")
+
+if config.cube_config.smoother_labels:
+    if papyrus_label_name in viewer.layers:
+        toggle_smooth_labels(viewer, viewer.layers[papyrus_label_name])
+    if ink_label_name in viewer.layers:
+        toggle_smooth_labels(viewer, viewer.layers[ink_label_name])
+
+viewer.window.add_dock_widget(toggle_smooth_labels)
+viewer.dims.ndisplay = 3
 
 app = QApplication([])
 loop = QEventLoop(app)
