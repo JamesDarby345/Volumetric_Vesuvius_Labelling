@@ -4,6 +4,7 @@ cube_info:
   scroll_name: 's1'
   chunk_size: 256
   pad_amount: 100
+  smoother_labels: True #Use smoother labels by default
   brush_size: 4
 
   main_label_layer_name: 'papyrus' # 'papyrus' or 'ink', sets the main label layer for functions to act on.

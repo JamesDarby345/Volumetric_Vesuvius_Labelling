@@ -912,6 +912,8 @@ async def save_labels_async(viewer, z=config.cube_config.z, y=config.cube_config
         show_popup(msg)
 
 def save_labels(viewer, z=config.cube_config.z, y=config.cube_config.y ,x=config.cube_config.x, should_show_popup=True, papyrus_labels=None, ink_labels=None):
+    if label_3d_name in viewer.layers:
+        update_label_from_3d_edit_layer(viewer)
     if papyrus_labels is None and papyrus_label_name in viewer.layers:
         papyrus_labels = viewer.layers[papyrus_label_name].data
     if ink_labels is None and ink_label_name in viewer.layers:
@@ -972,6 +974,8 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x):
     print(f"main fxn: Updating coordinates to z={new_z}, y={new_y}, x={new_x} from {config.cube_config.z}, {config.cube_config.y}, {config.cube_config.x}")
 
     # Save the current labels, before updating the coordinates
+    if label_3d_name in viewer.layers:
+        update_label_from_3d_edit_layer(viewer)
     papyrus_labels = None
     if papyrus_label_name in viewer.layers:
         papyrus_labels = viewer.layers[papyrus_label_name].data
@@ -1007,6 +1011,17 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x):
         viewer.layers.remove(cc_preview_name)
     if ff_name in viewer.layers:
         viewer.layers.remove(ff_name)
+
+    if main_label_name in viewer.layers:
+        viewer.layers.selection.active = viewer.layers[main_label_name]
+        viewer.layers[main_label_name].visible = True
+        viewer.layers[main_label_name].contour = 1
+        viewer.layers[main_label_name].opacity = 1
+        viewer.layers[main_label_name].blending = 'opaque'
+        # viewer.layers[main_label_name].color_mode = 'auto'
+        viewer.layers[main_label_name].colormap = get_direct_label_colormap()
+    elif data_name in viewer.layers:
+        viewer.layers.selection.active = viewer.layers[data_name]
 
     # Update the ZYX input in the GUI
     print(f"Updating ZYX input in GUI to {new_z}, {new_y}, {new_x}")
