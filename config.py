@@ -101,7 +101,10 @@ class CubeConfig:
     
     @property
     def create_papyrus_mask_if_not_provided(self):
-        return self.cube_info.get('create_papyrus_mask_if_not_provided', True)
+        val = self.cube_info.get('create_papyrus_mask_if_not_provided', True)
+        if self.cube_info.get('main_label_layer_name', "") != 'ink':
+            val = True
+        return val
 
     @property
     def scroll_name(self):

@@ -7,10 +7,10 @@ from collections import defaultdict
 from vispy.scene.cameras.perspective import PerspectiveCamera
 from vispy.util import keys
 from collections import deque
-import numba
 from sklearn.decomposition import PCA
 import yaml
 from pathlib import Path
+from scipy import ndimage
 
 def pad_array(array, chunk_size, pad_amount=1):
     """
@@ -215,32 +215,9 @@ def patched_viewbox_mouse_event(self, event):
     except Exception as e:
         print(f"Unexpected error in patched_viewbox_mouse_event: {e}")
 
-@numba.jit(nopython=True, parallel=True)
 def numba_dilation_3d_labels(data, iterations):
-    result = data.copy()
-    rows, cols, depths = data.shape
-    
-    for _ in range(iterations):
-        temp = result.copy()
-        for i in numba.prange(rows):
-            for j in range(cols):
-                for k in range(depths):
-                    if result[i, j, k] == 0:  # Only dilate into empty space
-                        # Check 6-connected neighbors
-                        if i > 0 and temp[i-1, j, k] != 0:
-                            result[i, j, k] = temp[i-1, j, k]
-                        elif i < rows-1 and temp[i+1, j, k] != 0:
-                            result[i, j, k] = temp[i+1, j, k]
-                        elif j > 0 and temp[i, j-1, k] != 0:
-                            result[i, j, k] = temp[i, j-1, k]
-                        elif j < cols-1 and temp[i, j+1, k] != 0:
-                            result[i, j, k] = temp[i, j+1, k]
-                        elif k > 0 and temp[i, j, k-1] != 0:
-                            result[i, j, k] = temp[i, j, k-1]
-                        elif k < depths-1 and temp[i, j, k+1] != 0:
-                            result[i, j, k] = temp[i, j, k+1]
-                        
-    return result
+    struct = ndimage.generate_binary_structure(3, 1)  # 6-connected structure
+    return ndimage.iterations(data, structure=struct, iterations=iterations)
 
 def show_popup(message):
     msg = QMessageBox()
