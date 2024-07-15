@@ -1,4 +1,4 @@
-name: napari_vesuvius_t
+name: napari_vesuvius
 channels:
   - conda-forge
   - defaults
