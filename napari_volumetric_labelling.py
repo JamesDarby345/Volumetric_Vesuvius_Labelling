@@ -4,7 +4,7 @@ import numpy as np
 from helper import *
 from gui_components import VesuviusGUI
 from napari.layers import Image
-
+from PyQt5.QtCore import QTimer
 from scipy.ndimage import binary_erosion
 from qtpy.QtWidgets import QMessageBox
 from qtpy.QtCore import QTimer
@@ -15,7 +15,6 @@ from collections import namedtuple
 from vispy.scene.cameras.perspective import Base3DRotationCamera
 from vispy.util import keys
 import asyncio
-from qasync import QEventLoop, QApplication
 from data_manager import DataManager
 from config import Config  # Assuming you create a Config class
 import warnings
@@ -27,6 +26,7 @@ warnings.filterwarnings("ignore", message="Valid config keys have changed in V2:
 warnings.filterwarnings("ignore", message="Refusing to run a QApplication with no topLevelWidgets.")
 
 config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
+
 config = Config(config_path)
 # if __name__ == "__main__":
 scroll_name = config.cube_config.scroll_name
@@ -655,8 +655,6 @@ def shift_data_right_fast_and_recut_3d_label(viewer):
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side, recut=True)
 
-from PyQt5.QtCore import QTimer
-
 # Global variables to track key states
 left_key_pressed = False
 right_key_pressed = False
@@ -682,14 +680,14 @@ def shift_data_left(viewer):
     left_key_pressed = True
     move_left(viewer)  # Move immediately on key press
     if not left_timer.isActive():
-        left_timer.start(30)  # Adjust the interval as needed
+        left_timer.start(500)  # Adjust the interval as needed
 
 def shift_data_right(viewer):
     global right_key_pressed
     right_key_pressed = True
     move_right(viewer)  # Move immediately on key press
     if not right_timer.isActive():
-        right_timer.start(30)  # Adjust the interval as needed
+        right_timer.start(500)  # Adjust the interval as needed
 
 def shift_data_left_fast(viewer, distance=20):
     move_left(viewer, distance)
@@ -770,7 +768,7 @@ def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
 def connected_components(viewer, preview=False, cc_layer_name=main_label_name):
     global erase_mode, cut_side
 
-    if not preview and viewer.layers[main_label_name].data is not None and ink_pred_data is not None and label_data is not None:
+    if not preview and viewer.layers[main_label_name].data is not None and data_manager.original_ink_pred_data is not None and data_manager.original_label_data is not None:
         cc_layer_name = select_from_list_popup("Connected Components", "Select the layer to apply connected components to", [papyrus_label_name, ink_label_name])
     if not preview:
         msg = "DANGER Are you sure you want to run connected components? This operation cannot be undone and removes the undo queue. Consider saving first. \n\nIF YOU HAVE DILATED SEPERATED LABELS AND THEY NOW TOUCH, THEY WILL BE COMBINED."
