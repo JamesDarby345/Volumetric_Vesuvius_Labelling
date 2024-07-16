@@ -15,7 +15,6 @@ dependencies:
   - scikit-learn
   - pyqt
   - numba
-  - itk
   - pip
   - pip:
     - pynrrd
