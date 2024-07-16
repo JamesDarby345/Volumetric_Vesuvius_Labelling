@@ -106,12 +106,19 @@ if ink_pred_data is not None:
     #     ink_pred_data = pad_array(ink_pred_data, config.cube_config.chunk_size)
     ink_labels_layer = viewer.add_labels(ink_pred_data, name=ink_label_name)
 
-@magicgui.magicgui
-def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labels):
+@magicgui.magicgui(auto_call=False, on={"visible": False})
+def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labels, on=False):
     if viewer.dims.ndisplay != 3:
         return
-    node = viewer.window.qt_viewer.layer_to_visual[layer].node
-    node.iso_gradient = not node.iso_gradient
+    try:
+        print("Toggling smooth labels for layer:", layer.name)
+        node = viewer.window.qt_viewer.layer_to_visual[layer].node
+        node.iso_gradient = not node.iso_gradient
+        if on:
+            node.iso_gradient = True
+    except Exception as e:
+        print("Error toggling smooth labels:", e)
+    
 
 # Functions:
 def align_plane_with_selected_label(viewer):
@@ -1081,9 +1088,9 @@ except Exception as e:
 
 if config.cube_config.smoother_labels:
     if papyrus_label_name in viewer.layers:
-        toggle_smooth_labels(viewer, viewer.layers[papyrus_label_name])
+        toggle_smooth_labels(viewer, viewer.layers[papyrus_label_name], on=True)
     if ink_label_name in viewer.layers:
-        toggle_smooth_labels(viewer, viewer.layers[ink_label_name])
+        toggle_smooth_labels(viewer, viewer.layers[ink_label_name], on=True)
 
 viewer.window.add_dock_widget(toggle_smooth_labels)
 viewer.dims.ndisplay = 3
