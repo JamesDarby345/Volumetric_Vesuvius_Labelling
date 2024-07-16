@@ -535,7 +535,7 @@ def setup_label_3d_layer(viewer, new_label_data, active_mode):
     new_label_layer.brush_size = brush_size
 
     if config.cube_config.smoother_labels:
-        toggle_smooth_labels(viewer, new_label_layer)
+        toggle_smooth_labels(viewer, new_label_layer, on=True)
 
     # Apply translation if pad_state is True
     if pad_state:
@@ -655,13 +655,17 @@ def shift_data_right_fast_and_recut_3d_label(viewer):
     if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
         cut_label_at_plane(viewer, erase_mode=erase_mode, cut_side=cut_side, recut=True)
 
+from PyQt5.QtCore import QTimer
+
+# Global variables to track key states
+left_key_pressed = False
+right_key_pressed = False
+
 # Define the functions to move left and right
 def move_left(viewer, distance=1):
-    # viewer.window._qt_viewer.viewer.dims._increment_dims_left()
     shift_plane(viewer.layers[data_name], -distance)
 
 def move_right(viewer, distance=1):
-    # viewer.window._qt_viewer.viewer.dims._increment_dims_right()
     shift_plane(viewer.layers[data_name], distance)
 
 # Create timers for holding keys
@@ -674,30 +678,50 @@ right_timer.timeout.connect(lambda: move_right(viewer))
 
 # Define the key press events
 def shift_data_left(viewer):
+    global left_key_pressed
+    left_key_pressed = True
     move_left(viewer)  # Move immediately on key press
     if not left_timer.isActive():
         left_timer.start(30)  # Adjust the interval as needed
 
 def shift_data_right(viewer):
+    global right_key_pressed
+    right_key_pressed = True
     move_right(viewer)  # Move immediately on key press
     if not right_timer.isActive():
         right_timer.start(30)  # Adjust the interval as needed
 
 def shift_data_left_fast(viewer, distance=20):
-    move_left(viewer, distance)  # Move immediately on key press
+    move_left(viewer, distance)
 
 def shift_data_right_fast(viewer, distance=20):
-    move_right(viewer, distance)  # Move immediately on key press
+    move_right(viewer, distance)
 
-# Function to stop timers when keys are released
-def stop_timers(event):
-    if event.key == 'a' and left_timer.isActive():
+# Function to handle key release events
+def handle_key_release(event):
+    global left_key_pressed, right_key_pressed
+    
+    if event.key == 'a':
+        left_key_pressed = False
+    elif event.key == 'd':
+        right_key_pressed = False
+    
+    # Check if keys are still pressed before stopping timers
+    if not left_key_pressed and left_timer.isActive():
         left_timer.stop()
-    elif event.key == 'd' and right_timer.isActive():
+    if not right_key_pressed and right_timer.isActive():
         right_timer.stop()
 
-# Connect the key release event to the function
-viewer.window._qt_viewer.canvas.events.key_release.connect(stop_timers)
+# Function to handle key press events
+def handle_key_press(event):
+    if event.key == 'a':
+        shift_data_left(viewer)
+    elif event.key == 'd':
+        shift_data_right(viewer)
+
+# Connect the key events to the functions
+viewer.window._qt_viewer.canvas.events.key_press.connect(handle_key_press)
+viewer.window._qt_viewer.canvas.events.key_release.connect(handle_key_release)
 
 def erase_mode_toggle(viewer):
     global eraser_size
