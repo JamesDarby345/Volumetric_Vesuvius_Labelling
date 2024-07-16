@@ -273,6 +273,7 @@ class DataManager:
         return mask
 
     async def save_label_data_async(self, z,y,x, data, label_type):
+        print(f"Saving label data for {z}_{y}_{x}")
         self.is_saving = True
         try:
             file_path = self.get_label_file_path(z,y,x, label_type)
