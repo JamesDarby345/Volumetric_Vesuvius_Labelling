@@ -1117,13 +1117,6 @@ if config.cube_config.smoother_labels:
         toggle_smooth_labels(viewer, viewer.layers[ink_label_name], on=True)
 
 viewer.window.add_dock_widget(toggle_smooth_labels)
-viewer.dims.ndisplay = 3
 
-# app = QApplication([])
-# loop = QEventLoop(app)
-# asyncio.set_event_loop(loop)
 # Start the Napari event loop
 napari.run()
-
-# with loop:
-#     loop.run_forever()
