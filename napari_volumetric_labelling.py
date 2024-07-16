@@ -4,6 +4,7 @@ import numpy as np
 from helper import *
 from gui_components import VesuviusGUI
 from napari.layers import Image
+
 from scipy.ndimage import binary_erosion
 from qtpy.QtWidgets import QMessageBox
 from qtpy.QtCore import QTimer
@@ -18,6 +19,7 @@ from qasync import QEventLoop, QApplication
 from data_manager import DataManager
 from config import Config  # Assuming you create a Config class
 import warnings
+import magicgui
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
 warnings.filterwarnings("ignore", message="Contours are not displayed during 3D rendering")
@@ -26,7 +28,7 @@ warnings.filterwarnings("ignore", message="Refusing to run a QApplication with n
 
 config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
 config = Config(config_path)
-
+# if __name__ == "__main__":
 scroll_name = config.cube_config.scroll_name
 zyx = config.cube_config.zyx
 z = config.cube_config.z
@@ -65,6 +67,7 @@ pad_state = False
 
 data = data_manager.raw_data
 label_data = data_manager.original_label_data
+# label_data = np.pad(label_data, 1, mode='constant', constant_values=0)
 ink_pred_data = data_manager.original_ink_pred_data
 
 # Initialize the Napari viewer
@@ -95,9 +98,27 @@ else:
 # Add the 3D data to the viewer
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
 if label_data is not None:
+    # if config.cube_config.smoother_labels:
+    #     label_data = pad_array(label_data, config.cube_config.chunk_size)
     papyrus_label_layer = viewer.add_labels(label_data, name=papyrus_label_name)
 if ink_pred_data is not None:
+    # if config.cube_config.smoother_labels:
+    #     ink_pred_data = pad_array(ink_pred_data, config.cube_config.chunk_size)
     ink_labels_layer = viewer.add_labels(ink_pred_data, name=ink_label_name)
+
+@magicgui.magicgui(auto_call=False, on={"visible": False})
+def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labels, on=False):
+    if viewer.dims.ndisplay != 3:
+        return
+    try:
+        print("Toggling smooth labels for layer:", layer.name)
+        node = viewer.window.qt_viewer.layer_to_visual[layer].node
+        node.iso_gradient = not node.iso_gradient
+        if on:
+            node.iso_gradient = True
+    except Exception as e:
+        print("Error toggling smooth labels:", e)
+    
 
 # Functions:
 def align_plane_with_selected_label(viewer):
@@ -432,7 +453,7 @@ def switch_to_plane_view(viewer):
     global prev_camera_pos
     if label_3d_name in viewer.layers:
             update_label_from_3d_edit_layer(viewer)
-   # Switch to 3D mode
+# Switch to 3D mode
     if viewer.dims.ndisplay == 3:
         prev_camera_pos = get_current_camera_info(viewer)
         viewer.dims.ndisplay = 2
@@ -513,6 +534,9 @@ def setup_label_3d_layer(viewer, new_label_data, active_mode):
     new_label_layer.mode = active_mode
     new_label_layer.brush_size = brush_size
 
+    if config.cube_config.smoother_labels:
+        toggle_smooth_labels(viewer, new_label_layer)
+
     # Apply translation if pad_state is True
     if pad_state:
         new_label_layer.translate = [pad_amount, pad_amount, pad_amount]
@@ -556,9 +580,9 @@ def cut_label_at_plane(viewer, erase_mode=False, cut_side=True, prev_plane_info=
     # Create a meshgrid for the label data coordinates
     label_shape = viewer.layers[main_label_name].data.shape
     z, y, x = np.meshgrid(np.arange(label_shape[0]),
-                          np.arange(label_shape[1]),
-                          np.arange(label_shape[2]),
-                          indexing='ij')
+                        np.arange(label_shape[1]),
+                        np.arange(label_shape[2]),
+                        indexing='ij')
 
     # Calculate the distance of each voxel from the plane
     distances = (x - adjusted_position[2]) * normal[2] + \
@@ -858,46 +882,62 @@ def dilate_labels(viewer):
     viewer.status = msg
     print(msg)
 
-async def save_labels_async(viewer, z=config.cube_config.z, y=config.cube_config.y ,x=config.cube_config.x, papyrus_labels=None, ink_labels=None, should_show_popup=True):
+@thread_worker
+def save_labels_worker(viewer, z, y, x, papyrus_labels, ink_labels):
     msg = 'save labels'
     viewer.status = msg
     print(msg)
 
-    if papyrus_label_name in viewer.layers and papyrus_labels.shape[0] != config.cube_config.chunk_size:
-        msg = "please remove additional context padding before saving"
-        show_popup(msg)
-        return
+    async def save_all():
+        tasks = []
 
-    tasks = []
+        # Save ink prediction data if it exists
+        if ink_labels is not None:
+            if ink_labels.shape[0] != config.cube_config.chunk_size:
+                ink_labels_unpadded = unpad_array(ink_labels, config.cube_config.chunk_size)
+            else:
+                ink_labels_unpadded = ink_labels
+            tasks.append(data_manager.save_label_data_async(z, y, x, ink_labels_unpadded, 'ink'))
 
-    # Save ink prediction data if it exists
-    if ink_labels is not None:
-        tasks.append(data_manager.save_label_data_async(z,y,x, ink_labels, 'ink'))
+        # Save papyrus label data
+        if papyrus_labels is not None:
+            print(f"papyrus_labels shape: {papyrus_labels.shape}")
+            if papyrus_labels.shape[0] != config.cube_config.chunk_size:
+                papyrus_labels_unpadded = unpad_array(papyrus_labels, config.cube_config.chunk_size)
+            else:
+                papyrus_labels_unpadded = papyrus_labels
+            print(f"papyrus_labels shape after unpad: {papyrus_labels_unpadded.shape}")
+            tasks.append(data_manager.save_label_data_async(z, y, x, papyrus_labels_unpadded, 'vol'))
 
-    # Save papyrus label data
-    if papyrus_labels is not None:
-        tasks.append(data_manager.save_label_data_async(z,y,x, papyrus_labels, 'vol'))
+        # Save raw data if it hasn't been saved before
+        tasks.append(data_manager.save_raw_data_async(z, y, x))
 
-    # Save raw data if it hasn't been saved before
-    tasks.append(data_manager.save_raw_data_async(z,y,x))
+        # Wait for all save tasks to complete
+        await asyncio.gather(*tasks)
 
-    # Wait for all save tasks to complete
-    await asyncio.gather(*tasks)
+    # Run the async function in the thread
+    asyncio.run(save_all())
 
-    output_path = data_manager.get_output_path(z,y,x)
-    if should_show_popup:
-        msg = f"Layers saved to {output_path}"
-        show_popup(msg)
+    return data_manager.get_output_path(z, y, x)
 
-def save_labels(viewer, z=config.cube_config.z, y=config.cube_config.y ,x=config.cube_config.x, should_show_popup=True, papyrus_labels=None, ink_labels=None):
+def save_labels(viewer, z=config.cube_config.z, y=config.cube_config.y, x=config.cube_config.x, should_show_popup=True, papyrus_labels=None, ink_labels=None):
+    if label_3d_name in viewer.layers:
+        update_label_from_3d_edit_layer(viewer)
     if papyrus_labels is None and papyrus_label_name in viewer.layers:
         papyrus_labels = viewer.layers[papyrus_label_name].data
     if ink_labels is None and ink_label_name in viewer.layers:
         ink_labels = viewer.layers[ink_label_name].data
+
+    worker = save_labels_worker(viewer, z, y, x, papyrus_labels, ink_labels)
     
-    asyncio.ensure_future(save_labels_async(viewer,z,y,x, papyrus_labels, ink_labels, should_show_popup))
     if should_show_popup:
-        show_popup("Saving has started. You will be notified when it's complete.")
+        worker.started.connect(lambda: show_popup("Saving has started. You will be notified when it's complete."))
+        worker.finished.connect(lambda: show_popup("Saving complete"))
+    
+    worker.returned.connect(lambda output_path: print(f"Layers saved to {output_path}"))
+    worker.errored.connect(lambda error: print(f"Error during saving: {error}"))
+
+    worker.start()
 
 def connected_components_preview(viewer):
     if cc_preview_name in viewer.layers and viewer.layers[cc_preview_name].visible:
@@ -950,6 +990,8 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x):
     print(f"main fxn: Updating coordinates to z={new_z}, y={new_y}, x={new_x} from {config.cube_config.z}, {config.cube_config.y}, {config.cube_config.x}")
 
     # Save the current labels, before updating the coordinates
+    if label_3d_name in viewer.layers:
+        update_label_from_3d_edit_layer(viewer)
     papyrus_labels = None
     if papyrus_label_name in viewer.layers:
         papyrus_labels = viewer.layers[papyrus_label_name].data
@@ -985,6 +1027,17 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x):
         viewer.layers.remove(cc_preview_name)
     if ff_name in viewer.layers:
         viewer.layers.remove(ff_name)
+
+    if main_label_name in viewer.layers:
+        viewer.layers.selection.active = viewer.layers[main_label_name]
+        viewer.layers[main_label_name].visible = True
+        viewer.layers[main_label_name].contour = 1
+        viewer.layers[main_label_name].opacity = 1
+        viewer.layers[main_label_name].blending = 'opaque'
+        # viewer.layers[main_label_name].color_mode = 'auto'
+        viewer.layers[main_label_name].colormap = get_direct_label_colormap()
+    elif data_name in viewer.layers:
+        viewer.layers.selection.active = viewer.layers[data_name]
 
     # Update the ZYX input in the GUI
     print(f"Updating ZYX input in GUI to {new_z}, {new_y}, {new_x}")
@@ -1033,11 +1086,20 @@ try:
 except Exception as e:
     print(f"Error adding label annotator widget: {str(e)}")
 
-app = QApplication([])
-loop = QEventLoop(app)
-asyncio.set_event_loop(loop)
+if config.cube_config.smoother_labels:
+    if papyrus_label_name in viewer.layers:
+        toggle_smooth_labels(viewer, viewer.layers[papyrus_label_name], on=True)
+    if ink_label_name in viewer.layers:
+        toggle_smooth_labels(viewer, viewer.layers[ink_label_name], on=True)
+
+viewer.window.add_dock_widget(toggle_smooth_labels)
+viewer.dims.ndisplay = 3
+
+# app = QApplication([])
+# loop = QEventLoop(app)
+# asyncio.set_event_loop(loop)
 # Start the Napari event loop
 napari.run()
 
-with loop:
-    loop.run_forever()
+# with loop:
+#     loop.run_forever()

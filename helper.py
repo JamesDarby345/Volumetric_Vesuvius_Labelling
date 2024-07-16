@@ -1,5 +1,4 @@
 import numpy as np
-from skimage.morphology import remove_small_objects, remove_small_holes
 import scipy.ndimage
 from qtpy.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QInputDialog, QWidget
@@ -10,9 +9,73 @@ from vispy.util import keys
 from collections import deque
 import numba
 from sklearn.decomposition import PCA
-from scipy.ndimage import gaussian_filter
 import yaml
 from pathlib import Path
+
+def pad_array(array, chunk_size, pad_amount=1):
+    """
+    Pad a 3D array with a specified number of layers of zeros if its size matches the chunk size.
+    
+    Args:
+    array (numpy.ndarray): The input 3D array.
+    chunk_size (int): The size of each dimension before padding.
+    pad_amount (int): The number of layers to pad on each side. Default is 1.
+    
+    Returns:
+    numpy.ndarray: The padded array if conditions are met, otherwise the original array.
+    """
+    if not isinstance(array, np.ndarray) or array.ndim != 3:
+        print("Input must be a 3D numpy array")
+        return array
+    
+    if not isinstance(chunk_size, int) or chunk_size <= 0:
+        print("Chunk size must be a positive integer")
+        return array
+
+    if not isinstance(pad_amount, int) or pad_amount < 0:
+        print("Pad amount must be a non-negative integer")
+        return array
+    
+    if all(dim == chunk_size for dim in array.shape):
+        return np.pad(array, 
+                      ((pad_amount, pad_amount), 
+                       (pad_amount, pad_amount), 
+                       (pad_amount, pad_amount)), 
+                      mode='constant', 
+                      constant_values=0)
+    else:
+        return array
+
+def unpad_array(array, chunk_size, pad_amount=1):
+    """
+    Remove the padding from a 3D array if its size is chunk_size + (2 * pad_amount) in each dimension.
+    
+    Args:
+    array (numpy.ndarray): The input 3D array.
+    chunk_size (int): The size of each dimension after unpadding.
+    pad_amount (int): The number of layers padded on each side. Default is 1.
+    
+    Returns:
+    numpy.ndarray: The unpadded array if conditions are met, otherwise the original array.
+    """
+    if not isinstance(array, np.ndarray) or array.ndim != 3:
+        print("Input must be a 3D numpy array")
+        return array
+    
+    if not isinstance(chunk_size, int) or chunk_size <= 0:
+        print("Chunk size must be a positive integer")
+        return array
+
+    if not isinstance(pad_amount, int) or pad_amount < 0:
+        print("Pad amount must be a non-negative integer")
+        return array
+    
+    if all(dim == chunk_size + (2 * pad_amount) for dim in array.shape):
+        return array[pad_amount:-pad_amount, 
+                     pad_amount:-pad_amount, 
+                     pad_amount:-pad_amount]
+    else:
+        return array
 
 def find_nearest_valid_coord(num):
         difference = num - 2000
@@ -69,25 +132,6 @@ def find_best_intersecting_plane_napari(array_3d):
     napari_normal = normal_vector
 
     return napari_position, napari_normal
-
-
-# def threshold_mask(array_3d, factor=1.0, min_size=1000, hole_size=1000):
-#     # Calculate the mean of the entire 3D array
-#     sigma = 2
-#     array_3d = gaussian_filter(array_3d, sigma=sigma)
-#     threshold = np.mean(array_3d) / factor
-    
-#     # Create initial mask
-#     mask = array_3d > threshold
-    
-#     # Remove small objects and holes
-#     mask = remove_small_objects(mask, min_size=min_size)
-#     mask = remove_small_holes(mask, area_threshold=hole_size)
-
-#     #remove bright spots, top 0.5% brightest voxels
-#     bright_spot_mask_arr = bright_spot_mask(array_3d)
-#     mask = mask | bright_spot_mask_arr
-#     return mask
 
 #monkey-patch the camera controls
 def patched_viewbox_mouse_event(self, event):

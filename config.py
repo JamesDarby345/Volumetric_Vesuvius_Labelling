@@ -96,6 +96,10 @@ class CubeConfig:
         return int(self.x)
     
     @property
+    def smoother_labels(self):
+        return self.cube_info.get('smoother_labels', False)
+    
+    @property
     def create_papyrus_mask_if_not_provided(self):
         return self.cube_info.get('create_papyrus_mask_if_not_provided', True)
 

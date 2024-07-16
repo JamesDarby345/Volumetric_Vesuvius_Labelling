@@ -4,7 +4,7 @@ channels:
   - defaults
 dependencies:
   - python
-  - napari=0.4.19
+  # - napari=0.4.19
   - numpy
   - zarr
   - scikit-image
@@ -23,3 +23,5 @@ dependencies:
     # - napari-threedee 
     # Use patched version of napari-threedee that prevents crash
     - git+https://github.com/JamesDarby345/napari-threedee-undo-bug.git
+    # use smoother labels fork for napari for now
+    - git+https://github.com/JamesDarby345/napari-smoother-labels.git
