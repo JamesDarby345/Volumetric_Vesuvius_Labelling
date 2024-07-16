@@ -22,6 +22,6 @@ dependencies:
     - blosc2
     # - napari-threedee 
     # Use patched version of napari-threedee that prevents crash
-    - git+https://github.com/JamesDarby345/napari-threedee-undo-bug.git
+    - git+https://github.com/JamesDarby345/napari-threedee-undo-bug.git@main
     # use smoother labels fork for napari for now
-    - git+https://github.com/JamesDarby345/napari-smoother-labels.git
+    - git+https://github.com/JamesDarby345/napari-smoother-labels.git@main
