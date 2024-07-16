@@ -535,7 +535,7 @@ def setup_label_3d_layer(viewer, new_label_data, active_mode):
     new_label_layer.brush_size = brush_size
 
     if config.cube_config.smoother_labels:
-        toggle_smooth_labels(viewer, new_label_layer)
+        toggle_smooth_labels(viewer, new_label_layer, on=True)
 
     # Apply translation if pad_state is True
     if pad_state:
