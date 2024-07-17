@@ -21,6 +21,7 @@ cube_info:
   ink_threshold: 150 # threshold value to binarize ink prediction zarr values for display as labels
   author: '' # optional author name to add to metadata
   factor: 1.0 
+  edit_chunk_size: 256 #chunk size to use when focussing on a chunk for label editing
 
 # Napari default keybinds will overwrite the custom keybinds in some modes
 # Thus, it is recommended to not use the default keybinds for custom keybinds
@@ -71,6 +72,7 @@ customizable_hotkeys:
   reset_plane_to_default: "b"
   reset_plane_view_to_default: "Shift-b"
   align_plane_with_selected_label: "n"
+  align_cube_with_selected_label: "Shift-n"
 
   save_labels: "h"
   decrease_brush_size: "Shift-z"

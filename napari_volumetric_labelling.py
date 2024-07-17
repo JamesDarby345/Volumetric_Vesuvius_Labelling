@@ -26,6 +26,7 @@ warnings.filterwarnings("ignore", message="Valid config keys have changed in V2:
 warnings.filterwarnings("ignore", message="Refusing to run a QApplication with no topLevelWidgets.")
 
 config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
+config_path = 'ink_det_config.yaml' if os.path.exists('ink_det_config.yaml') else 'napari_config.yaml'
 
 config = Config(config_path)
 # if __name__ == "__main__":
@@ -121,6 +122,31 @@ def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labe
     
 
 # Functions:
+def align_cube_with_selected_label(viewer, new_chunk_size=config.cube_config.edit_chunk_size):
+    if viewer.layers[main_label_name].visible:
+        align_layer = viewer.layers[main_label_name]
+    elif ink_pred_data is None or (not viewer.layers[ink_label_name].visible and viewer.layers[papyrus_label_name].visible):
+        align_layer = viewer.layers[papyrus_label_name]
+    else:
+        align_layer = viewer.layers[ink_label_name]
+    
+    # Get the selected label value
+    selected_label = align_layer.selected_label
+    if selected_label == 0:
+        print("No label selected.")
+        return
+    
+    masked_labels = (align_layer.data == selected_label).astype(np.uint8)
+    center_voxel = find_center_voxel(masked_labels)
+
+    center_voxel = np.array(center_voxel)
+    viewer.layers[data_name].plane.position = (new_chunk_size // 2, new_chunk_size // 2, new_chunk_size // 2)
+    center_voxel[0] += config.cube_config.z_num - (new_chunk_size // 2)
+    center_voxel[1] += config.cube_config.y_num - (new_chunk_size // 2)
+    center_voxel[2] += config.cube_config.x_num - (new_chunk_size // 2)
+
+    update_and_reload_data(viewer, data_manager, config, center_voxel[0], center_voxel[1], center_voxel[2], new_chunk_size)
+
 def align_plane_with_selected_label(viewer):
     if viewer.layers[main_label_name].visible:
         align_layer = viewer.layers[main_label_name]
@@ -1004,11 +1030,13 @@ def bind_hotkeys(viewer, hotkey_config, module=None, overwrite=True):
             except (ValueError, TypeError) as e:
                 print(f"Error binding key '{keys}' to function '{func_name}': {str(e)}")
 
-def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x):
+def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, new_chunk_size=None):
     if data_manager.is_saving:
         show_popup("A save operation is in progress. Please wait a few seconds before navigating to a new cube.")
         return False
-    
+    new_z = str(new_z).zfill(5)
+    new_y = str(new_y).zfill(5)
+    new_x = str(new_x).zfill(5)
     print(f"main fxn: Updating coordinates to z={new_z}, y={new_y}, x={new_x} from {config.cube_config.z}, {config.cube_config.y}, {config.cube_config.x}")
 
     # Save the current labels, before updating the coordinates
@@ -1023,6 +1051,8 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x):
     save_labels(viewer, config.cube_config.z, config.cube_config.y, config.cube_config.x, should_show_popup=False, papyrus_labels=papyrus_labels, ink_labels=ink_labels)
     
     config.cube_config.update_coordinates(new_z, new_y, new_x)
+    if new_chunk_size is not None:
+        config.cube_config.chunk_size = new_chunk_size
     data_manager.reload_data()
 
     # Update the layers in the viewer
