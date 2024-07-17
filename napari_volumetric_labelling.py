@@ -967,7 +967,16 @@ def save_labels_worker(viewer, z, y, x, papyrus_labels, ink_labels):
 
     return data_manager.get_output_path(z, y, x)
 
-def save_labels(viewer, z=config.cube_config.z, y=config.cube_config.y, x=config.cube_config.x, should_show_popup=True, papyrus_labels=None, ink_labels=None):
+def save_labels(viewer, z=None, y=None, x=None, should_show_popup=True, papyrus_labels=None, ink_labels=None):
+    if data_manager.is_saving:
+        show_popup("A save operation is in progress. Please wait a few seconds before navigating to a new cube.")
+        return False
+    if x is None:
+        x = config.cube_config.x
+    if y is None:
+        y = config.cube_config.y
+    if z is None:
+        z = config.cube_config.z
     if label_3d_name in viewer.layers:
         update_label_from_3d_edit_layer(viewer)
     if papyrus_labels is None and papyrus_label_name in viewer.layers:
@@ -1036,7 +1045,6 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
     new_z = str(new_z).zfill(5)
     new_y = str(new_y).zfill(5)
     new_x = str(new_x).zfill(5)
-    print(f"main fxn: Updating coordinates to z={new_z}, y={new_y}, x={new_x} from {config.cube_config.z}, {config.cube_config.y}, {config.cube_config.x}")
 
     # Save the current labels, before updating the coordinates
     if label_3d_name in viewer.layers:
@@ -1050,6 +1058,7 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
     save_labels(viewer, config.cube_config.z, config.cube_config.y, config.cube_config.x, should_show_popup=False, papyrus_labels=papyrus_labels, ink_labels=ink_labels)
     
     config.cube_config.update_coordinates(new_z, new_y, new_x)
+
     if new_chunk_size is not None:
         config.cube_config.chunk_size = new_chunk_size
     data_manager.reload_data()
@@ -1090,8 +1099,7 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
     elif data_name in viewer.layers:
         viewer.layers.selection.active = viewer.layers[data_name]
 
-    # Update the ZYX input in the GUI
-    print(f"Updating ZYX input in GUI to {new_z}, {new_y}, {new_x}")
+    #Update the GUI with the new coordinates
     gui.zyx_widget.zyx_input.setText(f"{new_z}_{new_y}_{new_x}")
 
 # Create a dictionary of functions to pass to the GUI

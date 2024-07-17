@@ -61,6 +61,13 @@ class DataManager:
                                                        self.cube_config.x_num:self.cube_config.x_num+self.cube_config.chunk_size]
             self.padded_raw_data = self.get_padded_data_zarr(raw_data_zarr_multi_res[0])
 
+    def create_papyrus_mask(self, nrrd_cube_folder_path, mask_file_path):
+        self.original_label_data = self.threshold_mask(self.raw_data, factor=self.cube_config.factor).astype(np.uint8)
+        os.makedirs(nrrd_cube_folder_path, exist_ok=True)
+        print("Creating Papyrus Label from thresholded raw data, may take a few seconds...")
+        nrrd.write(mask_file_path, self.original_label_data)
+        self.original_label_data, self.label_header = nrrd.read(mask_file_path)
+
     def load_label_data(self):
         output_folder_path = os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.cube_config.scroll_name}')
         saved_label_file_path = os.path.join(output_folder_path, 
@@ -74,14 +81,13 @@ class DataManager:
             print(f"Loading label data from saved label {saved_label_file_path}")
             self.original_label_data, self.label_header = nrrd.read(saved_label_file_path)
         elif os.path.exists(mask_file_path):
-            print(f"Loading label data from provided mask {mask_file_path}")
             self.original_label_data, self.label_header = nrrd.read(mask_file_path)
+            if self.original_label_data.shape[0] != self.cube_config.chunk_size:
+                self.create_papyrus_mask(nrrd_cube_folder_path, mask_file_path)
+            else:
+                print(f"Loaded label data from provided mask {mask_file_path}")
         elif self.cube_config.create_papyrus_mask_if_not_provided:
-            self.original_label_data = self.threshold_mask(self.raw_data, factor=self.cube_config.factor).astype(np.uint8)
-            os.makedirs(nrrd_cube_folder_path, exist_ok=True)
-            print("Creating Papyrus Label from thresholded raw data, may take a few seconds...")
-            nrrd.write(mask_file_path, self.original_label_data)
-            self.original_label_data, self.label_header = nrrd.read(mask_file_path)
+            self.create_papyrus_mask(nrrd_cube_folder_path, mask_file_path)
 
         if self.label_header is not None:
             print(self.label_header)
