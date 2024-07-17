@@ -26,7 +26,6 @@ warnings.filterwarnings("ignore", message="Valid config keys have changed in V2:
 warnings.filterwarnings("ignore", message="Refusing to run a QApplication with no topLevelWidgets.")
 
 config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
-config_path = 'ink_det_config.yaml' if os.path.exists('ink_det_config.yaml') else 'napari_config.yaml'
 
 config = Config(config_path)
 # if __name__ == "__main__":
