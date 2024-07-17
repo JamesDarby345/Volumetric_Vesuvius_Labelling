@@ -17,11 +17,10 @@ def pick_color(viewer):
         viewer.window._qt_viewer.canvas.bgcolor = color_tuple
 
 class ZYXNavigationWidget(QWidget):
-    def __init__(self, config, update_function, save_function, viewer):
+    def __init__(self, config, update_function, viewer):
         super().__init__()
         self.config = config
         self.update_function = update_function
-        self.save_function = save_function
         self.viewer = viewer
         self.setup_ui()
 
@@ -52,6 +51,7 @@ class ZYXNavigationWidget(QWidget):
             layout.addLayout(axis_layout)
 
     def update_zyx(self, new_zyx=None):
+        
         if new_zyx is None:
             new_zyx = self.zyx_input.text()
         if self.validate_zyx(new_zyx):
@@ -207,7 +207,7 @@ class VesuviusGUI:
 
     def setup_gui(self):
         # Create custom button widgets
-        self.zyx_widget = ZYXNavigationWidget(self.config, self.functions['update_and_reload_data'], self.functions['save_labels'], self.viewer)
+        self.zyx_widget = ZYXNavigationWidget(self.config, self.functions['update_and_reload_data'], self.viewer)
         self.viewer.window.add_dock_widget(self.zyx_widget, area='left')
 
         self.dilate_button = CustomButtonWidget("Dilate Labels", self.get_key_string('dilate_labels'), self.dilate_labels_gui)
