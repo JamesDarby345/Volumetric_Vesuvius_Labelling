@@ -21,6 +21,7 @@ class DataManager:
         self.original_label_data = None
         self.original_ink_pred_data = None
         self.label_header = None
+        self.raw_data_header = None
         self.raw_data_zarr_shape = None
         self.nrrd_cube_path = self.cube_config.nrrd_cube_path
         self.is_saving = False
@@ -311,19 +312,39 @@ class DataManager:
                     else:
                         open_timestamps = []
                     header['open_timestamps'] = str(open_timestamps)
-                    
+
+
+                    header['space origin'] = [float(z), float(y), float(x)]
+                    # print("header changes at",z,y,x)
                     header = dict(header)
             else:
-                header = None
+                header = self.create_default_nrrd_header(data, z, y, x)
 
             await self._save_nrrd_async(file_path, data, header)
         finally: 
             self.is_saving = False
 
-    async def save_raw_data_async(self,z,y,x):
-        file_path = self.get_raw_data_file_path(z,y,x)
+    async def save_raw_data_async(self, z, y, x):
+        file_path = self.get_raw_data_file_path(z, y, x)
+        
         if not os.path.exists(file_path):
-            await self._save_nrrd_async(file_path, self.raw_data)
+            print("saving raw data at path: ", file_path)
+
+            header = DataManager.create_default_nrrd_header(self.raw_data, z, y, x)
+
+            # Save the NRRD file with the updated header
+            await self._save_nrrd_async(file_path, self.raw_data, header)
+        else:
+            # If the file already exists, we might want to update its header
+            try:
+                print(f"Updating existing file header: {file_path}")
+                existing_data, existing_header = nrrd.read(file_path)
+                print(f"Existing header: {existing_header}")
+                if 'space origin' not in existing_header:
+                    existing_header['space origin'] = [float(z), float(y), float(x)]
+                    await self._save_nrrd_async(file_path, existing_data, existing_header)
+            except Exception as e:
+                print(f"Error updating existing file header: {e}")
 
     async def _save_nrrd_async(self, file_path, data, header=None):
         def save_task():
@@ -345,3 +366,17 @@ class DataManager:
     def get_output_path(self, z,y,x):
         return os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.cube_config.scroll_name}', 
                             f'{z}_{y}_{x}')
+    
+    def create_default_nrrd_header(data,z=0,y=0,x=0):
+        header = {
+            'type': data.dtype.name,
+            'dimension': data.ndim,
+            'space': 'left-posterior-superior',
+            'sizes': data.shape,
+            'space directions': np.eye(data.ndim).tolist(),
+            'kinds': ['domain'] * data.ndim,
+            'endian': 'little',
+            'encoding': 'raw',
+            'space origin': [float(z), float(y), float(x)]  # Use a list of floats
+        }
+        return header
