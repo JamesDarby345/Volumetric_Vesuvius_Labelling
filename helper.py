@@ -11,6 +11,7 @@ import numba
 from sklearn.decomposition import PCA
 import yaml
 from pathlib import Path
+from scipy import ndimage
 
 def pad_array(array, chunk_size, pad_amount=1):
     """
@@ -204,8 +205,9 @@ def patched_viewbox_mouse_event(self, event):
             #     # exit()
             #     if self._event_value is None:
             #         self._event_value = self._fov
-            #     fov = self._event_value - d[1] / 5.0
+            #     fov = self._event_value[1] - d[1] / 50.0
             #     self.fov = min(180.0, max(0.0, fov))
+
     except AttributeError as e:
         print(f"AttributeError in patched_viewbox_mouse_event: {e}")
     except ValueError as e:
@@ -214,6 +216,19 @@ def patched_viewbox_mouse_event(self, event):
         print(f"TypeError in patched_viewbox_mouse_event: {e}")
     except Exception as e:
         print(f"Unexpected error in patched_viewbox_mouse_event: {e}")
+
+def find_center_voxel(mask):
+    # Ensure the mask is boolean
+    mask = mask.astype(bool)
+
+    # Calculate the center of mass
+    center_of_mass = ndimage.center_of_mass(mask)
+
+    # Round to nearest integer to get voxel coordinates
+    center_voxel = np.round(center_of_mass).astype(int)
+
+    # Return as z, y, x
+    return tuple(center_voxel)
 
 @numba.jit(nopython=True, parallel=True)
 def numba_dilation_3d_labels(data, iterations):

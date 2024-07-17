@@ -110,6 +110,14 @@ class CubeConfig:
     @property
     def chunk_size(self):
         return self.cube_info.get('chunk_size', 256)
+    
+    @chunk_size.setter
+    def chunk_size(self, value):
+        self.cube_info['chunk_size'] = value
+
+    @property
+    def edit_chunk_size(self):
+        return self.cube_info.get('edit_chunk_size', 256)
 
     @property
     def pad_amount(self):
