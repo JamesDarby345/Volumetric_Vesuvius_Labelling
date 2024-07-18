@@ -38,11 +38,15 @@ z_num = int(z)
 y_num = int(y)
 x_num = int(x)
 
-if scroll_name == 's1' and not is_valid_coord_s1([z_num, y_num, x_num]):
+# Check if the initial coordinates are valid and align them if not
+origin_val = 0
+if scroll_name == 's1' or scroll_name == 's1_8um':
+    origin_val = 2000
+if config.cube_config.align_coordinates and not is_valid_coord([z_num, y_num, x_num], origin_val, config.cube_config.chunk_size):
     print(f"Invalid coordinates: {z_num}, {y_num}, {x_num}")
-    z_num = find_nearest_valid_coord(z_num)
-    y_num = find_nearest_valid_coord(y_num)
-    x_num = find_nearest_valid_coord(x_num)
+    z_num = find_nearest_valid_coord(z_num, origin_val, config.cube_config.chunk_size)
+    y_num = find_nearest_valid_coord(y_num, origin_val, config.cube_config.chunk_size)
+    x_num = find_nearest_valid_coord(x_num, origin_val, config.cube_config.chunk_size)
     print(f"Using nearest valid coordinates: {z_num}, {y_num}, {x_num}")
     z = str(z_num).zfill(5)
     y = str(y_num).zfill(5)

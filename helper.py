@@ -78,27 +78,47 @@ def unpad_array(array, chunk_size, pad_amount=1):
     else:
         return array
 
-def find_nearest_valid_coord(num):
-        difference = num - 2000
-        quotient = difference // 256
-        remainder = difference % 256
-
-        if remainder == 0:
-            result = num
-        elif remainder > 128:
-            result = 2000 + 256 * (quotient + 1)
+def find_nearest_valid_coord(num, origin=2000, chunk_size=256):
+    # Convert inputs to numpy arrays for easier handling
+    num = np.array(num)
+    origin = np.array(origin)
+    
+    # Ensure num and origin have the same shape
+    if num.shape != origin.shape:
+        if origin.size == 1:
+            origin = np.full_like(num, origin)
+        elif num.size == 1:
+            num = np.full_like(origin, num)
         else:
-            result = 2000 + 256 * quotient
-        
-        return max(result, 208)
+            raise ValueError("num and origin must have the same shape or one must be a scalar")
 
-def is_valid_coord_s1(num_or_list):
+    difference = num - origin
+    quotient = difference // chunk_size
+    remainder = difference % chunk_size
+
+    result = np.where(remainder == 0, num,
+                      np.where(remainder > chunk_size / 2, 
+                               origin + chunk_size * (quotient + 1),
+                               origin + chunk_size * quotient))
+    
+    lower_bound = origin - (7 * chunk_size)
+    return np.maximum(result, lower_bound)
+
+def is_valid_coord(num_or_list, origin=2000, chunk_size=256):
+    # Ensure origin is a list or numpy array
+    if isinstance(origin, (int, float)):
+        origin = [origin] * (3 if isinstance(num_or_list, (list, np.ndarray)) else 1)
+    origin = np.array(origin)
+
     if isinstance(num_or_list, (int, float)):
-        difference = abs(num_or_list - 2000)
-        return difference % 256 == 0
+        difference = abs(num_or_list - origin[0])
+        return difference % chunk_size == 0
     elif isinstance(num_or_list, (list, np.ndarray)):
-        differences = np.abs(np.array(num_or_list) - 2000)
-        return (differences % 256 == 0).all()
+        num_or_list = np.array(num_or_list)
+        if len(num_or_list) != len(origin):
+            raise ValueError("Length of input and origin must match")
+        differences = np.abs(num_or_list - origin)
+        return (differences % chunk_size == 0).all()
     else:
         raise TypeError("Input must be a number, list, or numpy array")
 

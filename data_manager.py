@@ -9,6 +9,7 @@ from datetime import datetime
 from collections import defaultdict
 from scipy.ndimage import gaussian_filter
 from skimage.morphology import remove_small_objects, remove_small_holes
+from skimage.filters import threshold_otsu
 import asyncio
 import ast
 from helper import *
@@ -230,7 +231,15 @@ class DataManager:
     def threshold_mask(array_3d, factor=1.0, min_size=1000, hole_size=1000):
         sigma = 2
         array_3d = gaussian_filter(array_3d, sigma=sigma)
-        threshold = np.mean(array_3d) / factor
+        
+        # Flatten the 3D array to 1D for Otsu's method
+        flat_array = array_3d.flatten()
+        
+        # Calculate Otsu's threshold
+        otsu_threshold = threshold_otsu(flat_array)
+        
+        # Apply the factor to the Otsu threshold
+        threshold = otsu_threshold / factor
         
         mask = array_3d > threshold
         

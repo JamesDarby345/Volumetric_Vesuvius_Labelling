@@ -96,6 +96,10 @@ class CubeConfig:
         return int(self.x)
     
     @property
+    def align_coordinates(self):
+        return self.cube_info.get('align_coordinates', True)
+    
+    @property
     def smoother_labels(self):
         return self.cube_info.get('smoother_labels', False)
     
