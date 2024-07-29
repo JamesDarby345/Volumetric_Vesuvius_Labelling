@@ -288,6 +288,31 @@ class DataManager:
         mask = data > threshold
         return mask
 
+    def check_and_update_header(self, header, z,y,x):
+        updated = False
+        
+        if 'space' not in header or header['space'] != 'left-posterior-superior':
+            header['space'] = 'left-posterior-superior'
+            updated = True
+
+        if 'space directions' not in header or header['space directions'].shape != (3, 3):
+            header['space directions'] = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=float)
+            updated = True
+
+        if 'kinds' not in header or len(header['kinds']) != 3:
+            header['kinds'] = ['domain', 'domain', 'domain']
+            updated = True
+
+        if 'endian' not in header:
+            header['endian'] = 'little'
+            updated = True
+
+        if 'space origin' not in header:
+            header['space origin'] = [float(z), float(y), float(x)]
+            updated = True
+
+        return header, updated
+
     async def save_label_data_async(self, z,y,x, data, label_type):
         print(f"Saving label data for {z}_{y}_{x}")
         self.is_saving = True
@@ -322,8 +347,9 @@ class DataManager:
                         open_timestamps = []
                     header['open_timestamps'] = str(open_timestamps)
 
+                    header, updated = self.check_and_update_header(header, z, y, x)
 
-                    header['space origin'] = [float(z), float(y), float(x)]
+                    
                     # print("header changes at",z,y,x)
                     header = dict(header)
             else:
@@ -349,9 +375,9 @@ class DataManager:
                 print(f"Updating existing file header: {file_path}")
                 existing_data, existing_header = nrrd.read(file_path)
                 print(f"Existing header: {existing_header}")
-                if 'space origin' not in existing_header:
-                    existing_header['space origin'] = [float(z), float(y), float(x)]
-                    await self._save_nrrd_async(file_path, existing_data, existing_header)
+                header, updated = self.check_and_update_header(existing_header, z, y, x)
+                if updated:
+                    await self._save_nrrd_async(file_path, existing_data, header)
             except Exception as e:
                 print(f"Error updating existing file header: {e}")
 

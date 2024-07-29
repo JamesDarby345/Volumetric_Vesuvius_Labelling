@@ -815,7 +815,7 @@ def connected_components(viewer, preview=False, cc_layer_name=main_label_name):
         cc_data = viewer.layers[cc_layer_name].data.copy()
     print(np.sum(cc_data > 0))
 
-    cc_result = label_foreground_structures_napari(cc_data, min_size=10)
+    cc_result = label_foreground_structures_napari(cc_data, min_size=config.cube_config.cc_min_size)
     print(cc_result.shape)
     print(np.sum(cc_result > 0))
     if preview:

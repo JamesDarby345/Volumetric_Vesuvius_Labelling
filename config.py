@@ -96,6 +96,10 @@ class CubeConfig:
         return int(self.x)
     
     @property
+    def cc_min_size(self):
+        return self.cube_info.get('cc_min_size', 800)
+    
+    @property
     def align_coordinates(self):
         return self.cube_info.get('align_coordinates', True)
     

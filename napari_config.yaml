@@ -6,6 +6,7 @@ cube_info:
   pad_amount: 100
   smoother_labels: True #Use smoother labels by default
   brush_size: 4
+  cc_min_size: 300 #minimum number of voxels of an object to not be filtered out by connected components
 
   main_label_layer_name: 'papyrus' # 'papyrus' or 'ink', sets the main label layer for functions to act on.
   #Note that Scroll 1 alignment origin is 2000,2000,2000, other scrolls use 0,0,0
