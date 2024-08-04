@@ -26,6 +26,7 @@ warnings.filterwarnings("ignore", message="Valid config keys have changed in V2:
 warnings.filterwarnings("ignore", message="Refusing to run a QApplication with no topLevelWidgets.")
 
 config_path = 'local_napari_config.yaml' if os.path.exists('local_napari_config.yaml') else 'napari_config.yaml'
+# config_path = 'ink_det_config.yaml' if os.path.exists('ink_det_config.yaml') else 'napari_config.yaml'
 
 config = Config(config_path)
 # if __name__ == "__main__":
@@ -70,7 +71,7 @@ current_directory = os.getcwd()
 pad_state = False
 
 data = data_manager.raw_data
-label_data = data_manager.original_label_data
+label_data = data_manager.label_data
 # label_data = np.pad(label_data, 1, mode='constant', constant_values=0)
 ink_pred_data = data_manager.original_ink_pred_data
 
@@ -797,7 +798,7 @@ def cut_label_at_oblique_plane(viewer, switch=True, prev_plane_info=None):
 def connected_components(viewer, preview=False, cc_layer_name=main_label_name):
     global erase_mode, cut_side
 
-    if not preview and viewer.layers[main_label_name].data is not None and data_manager.original_ink_pred_data is not None and data_manager.original_label_data is not None:
+    if not preview and viewer.layers[main_label_name].data is not None and data_manager.original_ink_pred_data is not None and data_manager.label_data is not None:
         cc_layer_name = select_from_list_popup("Connected Components", "Select the layer to apply connected components to", [papyrus_label_name, ink_label_name])
     if not preview:
         msg = "DANGER Are you sure you want to run connected components? This operation cannot be undone and removes the undo queue. Consider saving first. \n\nIF YOU HAVE DILATED SEPERATED LABELS AND THEY NOW TOUCH, THEY WILL BE COMBINED."
@@ -1069,11 +1070,11 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
 
     # Update the layers in the viewer
     viewer.layers[data_name].data = data_manager.raw_data
-    if data_manager.original_label_data is not None:
+    if data_manager.label_data is not None:
         if papyrus_label_name in viewer.layers:
-            viewer.layers[papyrus_label_name].data = data_manager.original_label_data
+            viewer.layers[papyrus_label_name].data = data_manager.label_data
         else:
-            viewer.add_labels(data_manager.original_label_data, name=papyrus_label_name)
+            viewer.add_labels(data_manager.label_data, name=papyrus_label_name)
     elif papyrus_label_name in viewer.layers:
         viewer.layers.remove(papyrus_label_name)
 

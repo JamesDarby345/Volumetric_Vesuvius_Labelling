@@ -20,6 +20,7 @@ class DataManager:
         self.raw_data = None
         self.padded_raw_data = None
         self.original_label_data = None
+        self.label_data = None
         self.original_ink_pred_data = None
         self.label_header = None
         self.raw_data_header = None
@@ -35,6 +36,7 @@ class DataManager:
         self.raw_data = None
         self.padded_raw_data = None
         self.original_label_data = None
+        self.label_data = None
         self.original_ink_pred_data = None
         self.label_header = None
         self.nrrd_cube_path = self.cube_config.nrrd_cube_path
@@ -69,6 +71,7 @@ class DataManager:
         print("Creating Papyrus Label from thresholded raw data, may take a few seconds...")
         nrrd.write(mask_file_path, self.original_label_data)
         self.original_label_data, self.label_header = nrrd.read(mask_file_path)
+        self.label_data = self.original_label_data
 
     def load_label_data(self):
         output_folder_path = os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.cube_config.scroll_name}')
@@ -81,14 +84,18 @@ class DataManager:
 
         if os.path.exists(saved_label_file_path):
             print(f"Loading label data from saved label {saved_label_file_path}")
-            self.original_label_data, self.label_header = nrrd.read(saved_label_file_path)
-        elif os.path.exists(mask_file_path):
-            self.original_label_data, self.label_header = nrrd.read(mask_file_path)
-            if self.original_label_data.shape[0] != self.cube_config.chunk_size:
+            self.label_data, self.label_header = nrrd.read(saved_label_file_path)
+        if os.path.exists(mask_file_path):
+            if self.label_data is None:
+                self.label_data, self.label_header = nrrd.read(mask_file_path)
+                self.original_label_data = self.label_data
+            else:
+                self.original_label_data, self.label_header = nrrd.read(mask_file_path)
+            if self.label_data.shape[0] != self.cube_config.chunk_size:
                 self.create_papyrus_mask(nrrd_cube_folder_path, mask_file_path)
             else:
                 print(f"Loaded label data from provided mask {mask_file_path}")
-        elif self.cube_config.create_papyrus_mask_if_not_provided:
+        elif self.label_data is None and self.cube_config.create_papyrus_mask_if_not_provided:
             self.create_papyrus_mask(nrrd_cube_folder_path, mask_file_path)
 
         if self.label_header is not None:
@@ -102,6 +109,7 @@ class DataManager:
 
         if self.cube_config.smoother_labels and self.original_label_data is not None:
             self.original_label_data = pad_array(self.original_label_data, self.cube_config.chunk_size)
+            self.label_data = pad_array(self.label_data, self.cube_config.chunk_size)
 
     def load_ink_pred_data(self):
         saved_ink_pred_file_path = os.path.join(os.getcwd(), 'output', 
