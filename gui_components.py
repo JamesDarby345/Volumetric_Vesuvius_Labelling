@@ -160,7 +160,7 @@ class VesuviusGUI:
         layout.setSpacing(8)
         
         buttons = [self.dilate_button, self.erode_button, self.full_view_button, self.plane_cut_button, 
-                self.cut_plane_button, self.padding_button, self.components_button, self.save_button]
+                self.cut_plane_button, self.padding_button, self.components_button, self.color_semantic_label_button, self.save_button]
         
         for button in buttons:
             layout.addWidget(button)
@@ -217,6 +217,7 @@ class VesuviusGUI:
         self.padding_button = CustomButtonWidget("Toggle Padding Context", self.get_key_string('toggle_contextual_view'), self.toggle_padding_context)
         self.cut_plane_button = CustomButtonWidget("Cut Label at Plane", self.get_key_string('cut_label_at_oblique_plane'), self.cut_label_at_plane_gui)
         self.components_button = CustomButtonWidget("Connected Components", self.get_key_string('connected_components'), self.run_connected_components)
+        self.color_semantic_label_button = CustomButtonWidget("Color Semantic Mask", '', self.color_semantic_mask)
         self.save_button = CustomButtonWidget("Save Labels", self.get_key_string('save_labels'), self.save_labels_button)
         color_picker_widget = ColorPickerWidget(self.viewer)
 
@@ -305,6 +306,9 @@ class VesuviusGUI:
 
     def run_connected_components(self):
         self.functions['connected_components'](self.viewer)
+
+    def color_semantic_mask(self):
+        self.functions['color_semantic_mask'](self.viewer)
 
     def save_labels_button(self):
         self.functions['save_labels'](self.viewer, self.config.cube_config.z, self.config.cube_config.y, self.config.cube_config.x)

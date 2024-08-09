@@ -109,9 +109,9 @@ if label_data is not None:
 if ink_pred_data is not None:
     ink_labels_layer = viewer.add_labels(ink_pred_data, name=ink_label_name)
 if voxelized_segmentation_mesh_data is not None:
-    voxelized_segmentation_mesh_layer = viewer.add_labels(voxelized_segmentation_mesh_data, name=seg_mesh_name)
+    seg_mesh_layer = viewer.add_labels(voxelized_segmentation_mesh_data, name=seg_mesh_name)
     offset = np.array([config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount])
-    voxelized_segmentation_mesh_layer.translate = -offset
+    seg_mesh_layer.translate = -offset
 
 @magicgui.magicgui(auto_call=False, on={"visible": False})
 def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labels, on=False):
@@ -130,7 +130,7 @@ def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labe
 # Functions:
 def color_semantic_mask(viewer):
     print("Coloring semantic mask.")
-    colored_papyrus_label = assign_nearest_segmentation_values_array(viewer.layers[papyrus_label_name].data, viewer.layers[seg_mesh_name].data)
+    colored_papyrus_label = assign_nearest_segmentation_values(viewer.layers[papyrus_label_name].data, viewer.layers[seg_mesh_name].data)
     viewer.layers[papyrus_label_name].data = colored_papyrus_label
 
 def align_cube_with_selected_label(viewer, new_chunk_size=config.cube_config.edit_chunk_size):
@@ -1123,9 +1123,9 @@ functions_dict = {
     'toggle_contextual_view': toggle_contextual_view,
     'cut_label_at_oblique_plane': cut_label_at_oblique_plane,
     'connected_components': connected_components,
+    'color_semantic_mask': color_semantic_mask,
     'save_labels': save_labels,
     'update_and_reload_data': lambda z, y, x: update_and_reload_data(viewer, data_manager, config, z, y, x),
-    # 'save_labels_auto': lambda: save_labels(viewer),
 }
 
 def update_global_erase_slice_width(value):
@@ -1138,6 +1138,8 @@ gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, confi
 gui.setup_napari_defaults(main_label_name)
 if papyrus_label_name in viewer.layers:
     papyrus_label_layer.colormap = get_direct_label_colormap()
+if seg_mesh_name in viewer.layers:
+    seg_mesh_layer.colormap = get_direct_label_colormap()
 
 bind_hotkeys(viewer, config.hotkey_config)
 set_camera_view(viewer)
