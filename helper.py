@@ -13,6 +13,50 @@ import yaml
 from pathlib import Path
 from scipy import ndimage
 
+from scipy.spatial import cKDTree
+
+def assign_nearest_segmentation_values_array(papyrus_data, seg_mesh_data):
+    """
+    Assign values to non-zero voxels in papyrus_data based on the nearest non-zero voxels in seg_mesh_data.
+    
+    Parameters:
+    papyrus_data (np.array): 3D array of the papyrus label (chunk_size^3)
+    seg_mesh_data (np.array): 3D array of the segmentation mesh ((chunk_size + pad_amount*2)^3)
+    
+    Returns:
+    np.array: Updated papyrus data array
+    """
+    # Ensure the papyrus data is centered within the seg mesh data
+    pad_amount = (seg_mesh_data.shape[0] - papyrus_data.shape[0]) // 2
+    
+    # Create a mask of non-zero voxels in the papyrus label
+    papyrus_mask = papyrus_data != 0
+
+    # Find non-zero voxels in the segmentation mesh
+    seg_non_zero = np.argwhere(seg_mesh_data != 0)
+
+    # Create a KD-tree for efficient nearest neighbor search
+    tree = cKDTree(seg_non_zero)
+
+    # Find non-zero voxels in the papyrus label
+    papyrus_non_zero = np.argwhere(papyrus_mask)
+
+    # Adjust papyrus coordinates to match seg_mesh coordinates
+    papyrus_non_zero_adjusted = papyrus_non_zero + pad_amount
+
+    # Find nearest neighbors
+    _, indices = tree.query(papyrus_non_zero_adjusted)
+
+    # Create a new array for the updated papyrus label
+    updated_papyrus = np.zeros_like(papyrus_data)
+
+    # Assign values from seg_mesh to papyrus based on nearest neighbors
+    for papyrus_coord, seg_mesh_index in zip(papyrus_non_zero, indices):
+        seg_mesh_coord = seg_non_zero[seg_mesh_index]
+        updated_papyrus[tuple(papyrus_coord)] = seg_mesh_data[tuple(seg_mesh_coord)]
+
+    return updated_papyrus
+
 def pad_array(array, chunk_size, pad_amount=1):
     """
     Pad a 3D array with a specified number of layers of zeros if its size matches the chunk size.

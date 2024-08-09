@@ -12,6 +12,8 @@ from skimage.morphology import remove_small_objects, remove_small_holes
 from skimage.filters import threshold_otsu
 import asyncio
 import ast
+from scipy import ndimage
+import blosc2
 from helper import *
 
 class DataManager:
@@ -22,6 +24,7 @@ class DataManager:
         self.original_label_data = None
         self.label_data = None
         self.original_ink_pred_data = None
+        self.voxelized_segmentation_mesh_data = None
         self.label_header = None
         self.raw_data_header = None
         self.raw_data_zarr_shape = None
@@ -38,6 +41,7 @@ class DataManager:
         self.original_label_data = None
         self.label_data = None
         self.original_ink_pred_data = None
+        self.voxelized_segmentation_mesh_data = None
         self.label_header = None
         self.nrrd_cube_path = self.cube_config.nrrd_cube_path
 
@@ -48,7 +52,20 @@ class DataManager:
         self.load_raw_data()
         self.load_label_data()
         self.load_ink_pred_data()
+        self.load_voxelized_segmentation_mesh_data()
             
+    def load_voxelized_segmentation_mesh_data(self):
+        saved_mesh_file_path = os.path.join(os.getcwd(), 'output', 
+                                            f'volumetric_labels_{self.cube_config.scroll_name}', 
+                                            f"{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}",
+                                            f"{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}_zyx_{self.cube_config.chunk_size}_chunk_{self.cube_config.scroll_name}_vol_seg-mesh.nrrd")
+
+        if os.path.exists(saved_mesh_file_path):
+            self.voxelized_segmentation_mesh_data, _ = nrrd.read(saved_mesh_file_path)
+        else:
+            current_directory = os.getcwd()
+            root_directory = f"{current_directory}/data/manual_sheet_segmentation/{self.cube_config.scroll_name}"
+            self.voxelized_segmentation_mesh_data = self.process_b2nd_files(root_directory, self.cube_config.z_num, self.cube_config.y_num, self.cube_config.x_num, self.cube_config.chunk_size, self.cube_config.voxelized_mesh_pad_amount)
 
     def load_raw_data(self):
         if not self.cube_config.using_raw_data_zarr:
@@ -234,6 +251,112 @@ class DataManager:
         ] = raw_data
 
         return padded_raw_data
+    
+    def combine_labeled_chunks(self, labeled_4d_array):
+        if labeled_4d_array.size == 0:
+            return None
+        time_steps, depth, height, width = labeled_4d_array.shape
+        combined_3d_array = np.zeros((depth, height, width), dtype=int)
+        removed_labels = set()
+
+        for t in range(time_steps):
+            current_chunk = labeled_4d_array[t]
+            current_labels = np.unique(current_chunk[current_chunk != 0])
+
+            for label in current_labels:
+                if label in removed_labels:
+                    continue
+
+                label_mask = current_chunk == label
+                overlap = np.any(combined_3d_array[label_mask] > 0)
+
+                if overlap:
+                    overlap_size = np.sum(combined_3d_array[label_mask] > 0)
+                    label_size = np.sum(label_mask)
+
+                    if label_size > overlap_size:
+                        overlapping_labels = np.unique(combined_3d_array[label_mask])
+                        for olap_label in overlapping_labels[overlapping_labels != 0]:
+                            combined_3d_array[combined_3d_array == olap_label] = 0
+                            removed_labels.add(olap_label)
+                        combined_3d_array[label_mask] = label
+                    else:
+                        removed_labels.add(label)
+                else:
+                    combined_3d_array[label_mask] = label
+
+        return combined_3d_array
+
+    def read_origin_file(self, file_path):
+        with open(file_path, 'r') as f:
+            return np.array([float(coord.strip()) for coord in f])
+
+    def find_b2nd_files(self, root_directory):
+        b2nd_files, origin_files = [], []
+        for dirpath, _, filenames in os.walk(root_directory):
+            for filename in filenames:
+                if filename.endswith('.b2nd'):
+                    b2nd_file = os.path.join(dirpath, filename)
+                    origin_file = os.path.join(dirpath, f"{filename.split('.')[0]}_origin.txt")
+                    if os.path.exists(origin_file):
+                        b2nd_files.append(b2nd_file)
+                        origin_files.append(origin_file)
+                    else:
+                        print(f"Warning: No matching origin file found for {b2nd_file}")
+        return b2nd_files, origin_files
+
+    def read_b2nd_chunk(self, file_path, origin, z, y, x, chunk_size, padding):
+        print(f"Processing file {file_path}")
+        nd_array = blosc2.open(file_path)
+        rel_z, rel_y, rel_x = z - int(origin[2]), y - int(origin[1]), x - int(origin[0])
+
+        if any(coord + padding >= shape or coord + chunk_size + padding <= -padding
+            for coord, shape in zip((rel_z, rel_y, rel_x), nd_array.shape[::-1])):
+            return None
+
+        slice_coords = [
+            (max(0, rel - padding), min(rel + chunk_size + padding, shape))
+            for rel, shape in zip((rel_z, rel_y, rel_x), nd_array.shape[::-1])
+        ]
+
+        chunk = np.array(nd_array[slice_coords[2][0]:slice_coords[2][1],
+                                slice_coords[1][0]:slice_coords[1][1],
+                                slice_coords[0][0]:slice_coords[0][1]])
+        chunk = np.swapaxes(chunk, 0, 2)
+
+        pad_before = [max(0, padding - (rel - start)) for rel, start in zip((rel_z, rel_y, rel_x), [coord[0] for coord in slice_coords])]
+        pad_after = [max(0, (chunk_size + 2 * padding) - chunk.shape[i] - pad_before[i]) for i in range(3)]
+
+        padded_chunk = np.pad(chunk, list(zip(pad_before, pad_after)), mode='constant', constant_values=0)
+
+        return padded_chunk if np.sum(padded_chunk) != 0 else None
+
+    def split_connected_components(self, chunk, chunk_i):
+        labeled_array, num_features = ndimage.label(chunk)
+        split_chunks = []
+        for label in range(1, num_features + 1):
+            component = (labeled_array == label)
+            if np.sum(component) > 0:
+                component_array = np.zeros_like(chunk)
+                component_array[component] = chunk_i
+                split_chunks.append(component_array)
+                chunk_i += 1
+        return split_chunks, chunk_i
+
+    def process_b2nd_files(self, root_directory, z, y, x, chunk_size, padding):
+        b2nd_files, origin_files = self.find_b2nd_files(root_directory)
+        chunks = []
+        chunk_i = 1
+
+        for b2nd_file, origin_file in zip(b2nd_files, origin_files):
+            origin = self.read_origin_file(origin_file)
+            chunk = self.read_b2nd_chunk(b2nd_file, origin, z, y, x, chunk_size, padding)
+            if chunk is not None:
+                split_chunks, chunk_i = self.split_connected_components(chunk, chunk_i)
+                chunks.extend(split_chunks)
+
+        result_array = np.stack(chunks, axis=0) if chunks else np.array([])
+        return self.combine_labeled_chunks(result_array)
 
     @staticmethod
     def threshold_mask(array_3d, factor=1.0, min_size=1000, hole_size=1000):

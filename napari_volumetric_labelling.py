@@ -20,6 +20,7 @@ from config import Config  # Assuming you create a Config class
 import warnings
 import magicgui
 
+
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
 warnings.filterwarnings("ignore", message="Contours are not displayed during 3D rendering")
 warnings.filterwarnings("ignore", message="Valid config keys have changed in V2:")
@@ -72,8 +73,8 @@ pad_state = False
 
 data = data_manager.raw_data
 label_data = data_manager.label_data
-# label_data = np.pad(label_data, 1, mode='constant', constant_values=0)
 ink_pred_data = data_manager.original_ink_pred_data
+voxelized_segmentation_mesh_data = data_manager.voxelized_segmentation_mesh_data
 
 # Initialize the Napari viewer
 viewer = napari.Viewer()
@@ -82,6 +83,7 @@ viewer = napari.Viewer()
 papyrus_label_name = 'Papyrus Labels'
 ink_label_name = 'Ink Labels'
 data_name = 'Data'
+seg_mesh_name = 'Segmentation Mesh'
 ff_name = 'Flood Fill'
 cc_preview_name = 'Connected Components Preview'
 label_3d_name = '3D Label Edit Layer'
@@ -103,13 +105,13 @@ else:
 # Add the 3D data to the viewer
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
 if label_data is not None:
-    # if config.cube_config.smoother_labels:
-    #     label_data = pad_array(label_data, config.cube_config.chunk_size)
     papyrus_label_layer = viewer.add_labels(label_data, name=papyrus_label_name)
 if ink_pred_data is not None:
-    # if config.cube_config.smoother_labels:
-    #     ink_pred_data = pad_array(ink_pred_data, config.cube_config.chunk_size)
     ink_labels_layer = viewer.add_labels(ink_pred_data, name=ink_label_name)
+if voxelized_segmentation_mesh_data is not None:
+    voxelized_segmentation_mesh_layer = viewer.add_labels(voxelized_segmentation_mesh_data, name=seg_mesh_name)
+    offset = np.array([config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount])
+    voxelized_segmentation_mesh_layer.translate = -offset
 
 @magicgui.magicgui(auto_call=False, on={"visible": False})
 def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labels, on=False):
@@ -126,6 +128,11 @@ def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labe
     
 
 # Functions:
+def color_semantic_mask(viewer):
+    print("Coloring semantic mask.")
+    colored_papyrus_label = assign_nearest_segmentation_values_array(viewer.layers[papyrus_label_name].data, viewer.layers[seg_mesh_name].data)
+    viewer.layers[papyrus_label_name].data = colored_papyrus_label
+
 def align_cube_with_selected_label(viewer, new_chunk_size=config.cube_config.edit_chunk_size):
     if viewer.layers[main_label_name].visible:
         align_layer = viewer.layers[main_label_name]
@@ -1155,6 +1162,8 @@ if config.cube_config.smoother_labels:
         toggle_smooth_labels(viewer, viewer.layers[papyrus_label_name], on=True)
     if ink_label_name in viewer.layers:
         toggle_smooth_labels(viewer, viewer.layers[ink_label_name], on=True)
+    if seg_mesh_name in viewer.layers:
+        toggle_smooth_labels(viewer, viewer.layers[seg_mesh_name], on=True)
 
 viewer.window.add_dock_widget(toggle_smooth_labels)
 

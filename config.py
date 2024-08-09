@@ -130,6 +130,10 @@ class CubeConfig:
     @property
     def pad_amount(self):
         return self.cube_info.get('pad_amount', 100)
+    
+    @property
+    def voxelized_mesh_pad_amount(self):
+        return self.cube_info.get('voxelized_mesh_pad_amount', 20)
 
     @property
     def brush_size(self):
