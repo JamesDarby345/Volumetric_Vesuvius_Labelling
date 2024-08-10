@@ -16,6 +16,43 @@ def pick_color(viewer):
         # Set the background color of the canvas
         viewer.window._qt_viewer.canvas.bgcolor = color_tuple
 
+class MoveSegMeshWidget(QWidget):
+    def __init__(self, viewer, move_function):
+        super().__init__()
+        self.viewer = viewer
+        self.move_function = move_function
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
+        # Title
+        title_label = QLabel("Move Segmentation Mesh")
+        layout.addWidget(title_label)
+
+        # dz, dy, dx inputs
+        for axis in ['dz', 'dy', 'dx']:
+            axis_layout = QHBoxLayout()
+            axis_layout.addWidget(QLabel(f"{axis}:"))
+            spinbox = QSpinBox()
+            spinbox.setRange(-100, 100)  # Adjust range as needed
+            spinbox.setValue(0)
+            setattr(self, f"{axis}_spinbox", spinbox)
+            axis_layout.addWidget(spinbox)
+            layout.addLayout(axis_layout)
+
+        # Move button
+        move_button = QPushButton("Move Selected Label")
+        move_button.clicked.connect(self.move_label)
+        layout.addWidget(move_button)
+
+    def move_label(self):
+        dz = self.dz_spinbox.value()
+        dy = self.dy_spinbox.value()
+        dx = self.dx_spinbox.value()
+        self.move_function(self.viewer, dz, dy, dx)
+
 class ZYXNavigationWidget(QWidget):
     def __init__(self, config, update_function, viewer):
         super().__init__()
@@ -137,6 +174,7 @@ class VesuviusGUI:
         self.erase_slice_width = 30
         self.config = config
         self.main_label_layer_name = main_label_layer_name
+        self.move_seg_mesh_widget = None 
         self.setup_gui()
 
     def get_key_string(self, func):
@@ -207,6 +245,9 @@ class VesuviusGUI:
 
     def setup_gui(self):
         # Create custom button widgets
+        self.move_seg_mesh_widget = MoveSegMeshWidget(self.viewer, self.functions['move_seg_mesh_label'])
+        self.viewer.window.add_dock_widget(self.move_seg_mesh_widget, area='left', name='Move Seg Mesh')
+
         self.zyx_widget = ZYXNavigationWidget(self.config, self.functions['update_and_reload_data'], self.viewer)
         self.viewer.window.add_dock_widget(self.zyx_widget, area='left')
 

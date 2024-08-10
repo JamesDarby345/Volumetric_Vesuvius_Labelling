@@ -112,6 +112,7 @@ if voxelized_segmentation_mesh_data is not None:
     seg_mesh_layer = viewer.add_labels(voxelized_segmentation_mesh_data, name=seg_mesh_name)
     offset = np.array([config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount])
     seg_mesh_layer.translate = -offset
+    seg_mesh_layer.opacity = 1
 
 @magicgui.magicgui(auto_call=False, on={"visible": False})
 def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labels, on=False):
@@ -128,6 +129,38 @@ def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labe
     
 
 # Functions:
+def move_seg_mesh_label(viewer, dz=1, dy=0, dx=0):
+    if seg_mesh_name not in viewer.layers:
+        print(f"Error: {seg_mesh_name} layer not found in the viewer.")
+        return
+
+    seg_mesh_layer = viewer.layers[seg_mesh_name]
+    selected_label = seg_mesh_layer.selected_label
+
+    if selected_label == 0:
+        print("Error: No label selected. Please select a label to move.")
+        return
+
+    seg_mesh_data = seg_mesh_layer.data.copy()
+    label_mask = seg_mesh_data == selected_label
+    seg_mesh_data[label_mask] = 0
+    z, y, x = np.nonzero(label_mask)
+
+    new_z = z + dz
+    new_y = y + dy
+    new_x = x + dx
+    within_bounds = (
+        (new_z >= 0) & (new_z < seg_mesh_data.shape[0]) &
+        (new_y >= 0) & (new_y < seg_mesh_data.shape[1]) &
+        (new_x >= 0) & (new_x < seg_mesh_data.shape[2])
+    )
+
+    seg_mesh_data[new_z[within_bounds], new_y[within_bounds], new_x[within_bounds]] = selected_label
+    seg_mesh_layer.data = seg_mesh_data
+
+    print(f"Label {selected_label} moved by (dz={dz}, dy={dy}, dx={dx}).")
+
+
 def color_semantic_mask(viewer):
     print("Coloring semantic mask.")
     colored_papyrus_label = assign_nearest_segmentation_values(viewer.layers[papyrus_label_name].data, viewer.layers[seg_mesh_name].data)
@@ -1126,6 +1159,7 @@ functions_dict = {
     'color_semantic_mask': color_semantic_mask,
     'save_labels': save_labels,
     'update_and_reload_data': lambda z, y, x: update_and_reload_data(viewer, data_manager, config, z, y, x),
+    'move_seg_mesh_label': move_seg_mesh_label,
 }
 
 def update_global_erase_slice_width(value):
