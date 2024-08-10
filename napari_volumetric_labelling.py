@@ -617,7 +617,8 @@ def setup_label_3d_layer(viewer, new_label_data, active_mode):
     
     # Add a new label layer with the updated data
     new_label_layer = viewer.add_labels(new_label_data, name=label_3d_name)
-    new_label_layer.colormap = get_direct_label_colormap()
+    if config.cube_config.use_custom_colormap:
+        new_label_layer.colormap = get_direct_label_colormap()
     
     new_label_layer.visible = visible_state
     new_label_layer.blending = 'opaque'
@@ -886,7 +887,8 @@ def connected_components(viewer, preview=False, cc_layer_name=main_label_name):
         else:
             viewer.add_labels(cc_result, name=cc_preview_name)
         viewer.layers[cc_preview_name].visible = True
-        viewer.layers[cc_preview_name].colormap = get_direct_label_colormap()
+        if config.cube_config.use_custom_colormap:
+            viewer.layers[cc_preview_name].colormap = get_direct_label_colormap()
         viewer.layers[cc_preview_name].editable = False
         viewer.layers[main_label_name].visible = False
         if label_3d_name in viewer.layers:
@@ -1092,7 +1094,8 @@ def reset_segmentation_mesh(viewer):
     offset = np.array([config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount])
     viewer.layers[seg_mesh_name].translate = -offset
     viewer.layers[seg_mesh_name].opacity = 1
-    viewer.layers[seg_mesh_name].colormap = get_direct_label_colormap()
+    if config.cube_config.use_custom_colormap:
+        viewer.layers[seg_mesh_name].colormap = get_direct_label_colormap()
 
     print("Segmentation mesh has been reset to the original b2nd data.")
     show_info("Segmentation mesh has been reset.")
@@ -1190,7 +1193,8 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
         offset = np.array([config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount])
         viewer.layers[seg_mesh_name].translate = -offset
         viewer.layers[seg_mesh_name].opacity = 1
-        viewer.layers[seg_mesh_name].colormap = get_direct_label_colormap()
+        if config.cube_config.use_custom_colormap:
+            viewer.layers[seg_mesh_name].colormap = get_direct_label_colormap()
     elif seg_mesh_name in viewer.layers:
         viewer.layers.remove(seg_mesh_name)
 
@@ -1207,7 +1211,8 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
         viewer.layers[main_label_name].contour = 1
         viewer.layers[main_label_name].opacity = 1
         viewer.layers[main_label_name].blending = 'opaque'
-        viewer.layers[main_label_name].colormap = get_direct_label_colormap()
+        if config.cube_config.use_custom_colormap:
+            viewer.layers[main_label_name].colormap = get_direct_label_colormap()
     elif data_name in viewer.layers:
         viewer.layers.selection.active = viewer.layers[data_name]
 
@@ -1240,9 +1245,9 @@ def update_global_erase_slice_width(value):
 seg_mesh_exists = seg_mesh_name in viewer.layers # Check if the segmentation mesh layer exists
 gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, config, config.cube_config.main_label_layer_name, seg_mesh_exists)
 gui.setup_napari_defaults(main_label_name)
-if papyrus_label_name in viewer.layers:
+if papyrus_label_name in viewer.layers and config.cube_config.use_custom_colormap:
     papyrus_label_layer.colormap = get_direct_label_colormap()
-if seg_mesh_name in viewer.layers:
+if seg_mesh_name in viewer.layers and config.cube_config.use_custom_colormap:
     seg_mesh_layer.colormap = get_direct_label_colormap()
 
 bind_hotkeys(viewer, config.hotkey_config)

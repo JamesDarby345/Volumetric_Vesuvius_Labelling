@@ -97,7 +97,11 @@ class CubeConfig:
     
     @property
     def cc_min_size(self):
-        return self.cube_info.get('cc_min_size', 800)
+        return self.cube_info.get('cc_min_size', 300)
+    
+    @property
+    def use_custom_colormap(self):
+        return self.cube_info.get('use_custom_colormap', True)
     
     @property
     def align_coordinates(self):
