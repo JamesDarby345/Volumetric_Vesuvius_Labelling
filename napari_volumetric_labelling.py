@@ -1237,7 +1237,8 @@ def update_global_erase_slice_width(value):
     print(f"Global erase width updated to: {erase_slice_width}")
 
 # Create the GUI
-gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, config, config.cube_config.main_label_layer_name)
+seg_mesh_exists = seg_mesh_name in viewer.layers # Check if the segmentation mesh layer exists
+gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, config, config.cube_config.main_label_layer_name, seg_mesh_exists)
 gui.setup_napari_defaults(main_label_name)
 if papyrus_label_name in viewer.layers:
     papyrus_label_layer.colormap = get_direct_label_colormap()

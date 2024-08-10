@@ -1,11 +1,12 @@
 ## Purpose of the repo:
-To provide custom tooling and extensions to the Napari 3d viewer that will help create more and better manually annotated volumetric masks of the Vesuvius Scrolls Data. These labels can be used to train ML Networks to separate sheets automatically, and make inroads to automatic segmentation, including in dense or compressed regions.
+To provide custom tooling and extensions to the Napari 3d viewer that will help create manual and semi-automatic annotated volumetric masks of the Vesuvius Scrolls Data. These labels can be used to train ML Networks to separate sheets automatically, and make inroads to automatic segmentation, including in dense or compressed regions. The repo has also been extended to explore, and edit ink detection volumes in 3d. This functionality allows for inspection of ink signal in unsegmented regions and 3d ink label refinement that allows for Human in the Loop ML cycles to hopefully find ink signal in the other scrolls.
 
 ## Features:
 -2D & 3D volumetric label editing<br>
 -Responsive 3D Erasing<br>
+-Segmentation mesh label coloring for semi-automated voumetric labelling<br>
 -3D Chunk View to limit view to relevant context<br>
--Oblique, 3D off-axis cuts, especially useful in dense and confusing regions (mostly in scroll 2)<br>
+-Oblique, 3D off-axis cuts, especially useful in dense and confusing regions<br>
 -Limited range flood fill to quickly find connections in 2d, and to serve as a landmark in 3d<br>
 -Single button extended cube context<br>
 -Label erosion & dilation<br>
@@ -21,11 +22,33 @@ conda env create -f environment.yml
 conda activate napari_vesuvius
 ```
 
-Create a /data/nrrd_cubes/s1 folder in the repository to put the nrrd cubes from the download server into. The s1 is the scroll_name value in the config, it can be changed to keep separate scroll cubes apart. Link to location of s1 cubes on the Vesuvius download server: https://dl.ash2txt.org/full-scrolls/Scroll1/PHercParis4.volpkg/seg-volumetric-labels/cubes_renamed/
+### Manual Volumetric Labelling setup
+Create a /data/nrrd_cubes/s1 folder in the repository to put the nrrd cubes from the download server into. The s1 folder is the scroll_name value in the config file, it can be changed to keep separate scroll cubes apart. Link to location of s1 cubes on the Vesuvius download server: https://dl.ash2txt.org/full-scrolls/Scroll1/PHercParis4.volpkg/seg-volumetric-labels/cubes/
 
 Copy the napari_config.yaml file and rename it local_napari_config.yaml
 Edit the z, y, x coordinates to match the ones of the cube you want to edit.
 You can also edit the hotkey buttons in the config file.
+
+### Zarr volume setup
+Additionally, if you have the scroll zarr volumes downloaded, you can specify the path to it with the raw_data_zarr_path. This allows the additional context function to always have the raw data context. Link to scroll 1 zarr volume (~980 GB): https://dl.ash2txt.org/community-uploads/james/Scroll1/ Link to scroll 2 zarr volume (2.2TB): https://dl.ash2txt.org/community-uploads/james/Scroll2/
+
+### Semi-Automated volumetric labelling setup
+Create a data/manual_sheet_segmentation/s1 folder, and put the segment id folders containing the voxelized GP segmentation meshes (the .b2nd and origin.txt files) in it. Link to voxelized GP segmentation meshes: https://dl.ash2txt.org/full-scrolls/Scroll1/PHercParis4.volpkg/seg-volumetric-labels/GP-banner/. Rclone download command (change local path): 
+```
+rclone copy --http-url https://dl.ash2txt.org/full-scrolls/Scroll1/PHercParis4.volpkg/seg-volumetric-labels/GP-banner/ :http: path/to/local/folder/Volumetric_Vesuvius_Labelling/data/manual_sheet_segmentation/s1 --multi-thread-streams 8 --transfers 8 --progress
+```
+
+### Ink Detection setup
+If you want to use the software for 3d ink detection volume inspection and label refinement, download or create a 3d ink detection zarr. <br>
+Link to bruniss' 3d ink detection zarrs: https://dl.ash2txt.org/community-uploads/bruniss/3d%20Ink%20/ <br>
+Link to emel ryan's 3d ink detection zarrs: https://dl.ash2txt.org/community-uploads/ryan/ <br>
+Specify the path to the ink detection zarr in the config with the ink_pred_zarr_path and change the main label layer name to 'ink'. If you are using the matching raw data zarr file, the axis should automatically align, if you are using nrrd cubes, you will have to specify the correct axis order with the raw_data_axis_order: 'zyx' and ink_pred_label_order: 'zyx' variables. Additionally if you are using the zarr, you can set the chunk_size to be larger so you can view more of the ink volume. If the ink detection volume uses a value range, set the ink_threshold value to provide a cutoff. Scroll 1 8um scan letters are approximately 400 voxels tall. 
+
+## How to use for labelling
+I wrote this google doc to explain how I use the software to manually label cubes: https://docs.google.com/document/d/1NVG1L2rLySrzstuXc2LvHFkdnJ0PZx1nwPMcYrs1fHM/edit?usp=sharing
+
+## How to use for 3d ink detection label inspection and refinement
+I wrote this google doc to explain how to use the 3d ink detection label refinement features: https://docs.google.com/document/d/1i-v9Qv2bNEm7CP5vXZHKkSAPX_S1nIStXoC2frAkg3E/edit?usp=sharing
 
 Please contact me with a github issue or \@james darby on the Vesuvius challenge discord server if you have a feature request or pain point description that would help volumetrically label data faster or more accurately.
 

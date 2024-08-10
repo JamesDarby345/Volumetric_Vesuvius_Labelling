@@ -14,6 +14,8 @@ cube_info:
   nrrd_cube_path: '' # Leave blank if using default nrrd cube location, or a zarr for raw data
   raw_data_zarr_path: '' # Ex: '/path/to/file.zarr'
   ink_pred_zarr_path: '' # Keep empty if not using ink prediction zarrs
+  create_papyrus_mask_if_not_provided: True # Create papyrus mask if not provided, turn off if just interested in ink
+
 
   # Variables to align raw data and ink pred axis
   # if both raw data and ink pred zarrs of the same size are used, 

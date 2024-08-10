@@ -184,7 +184,7 @@ class CustomButtonWidget(QWidget):
         self.setLayout(layout)
 
 class VesuviusGUI:
-    def __init__(self, viewer, functions_dict, update_global_erase_slice_width, config, main_label_layer_name='Papyrus Labels'):
+    def __init__(self, viewer, functions_dict, update_global_erase_slice_width, config, main_label_layer_name='Papyrus Labels', seg_mesh_exists=False):
         self.viewer = viewer
         self.functions = functions_dict
         self.update_global_erase_slice_width = update_global_erase_slice_width
@@ -192,7 +192,7 @@ class VesuviusGUI:
         self.config = config
         self.main_label_layer_name = main_label_layer_name
         self.move_seg_mesh_widget = None 
-        self.setup_gui()
+        self.setup_gui(seg_mesh_exists)
 
     def get_key_string(self, func):
         if not hasattr(self.config.hotkey_config, func):
@@ -260,11 +260,15 @@ class VesuviusGUI:
         scroll_area.setWidget(text_container)
         return scroll_area
 
-    def setup_gui(self):
+    def setup_gui(self, seg_mesh_exists=False):
         # Create custom button widgets
-        self.move_seg_mesh_widget = MoveSegMeshWidget(self.viewer, self.functions['move_seg_mesh_label'], self.functions['reset_segmentation_mesh'])
-        self.viewer.window.add_dock_widget(self.move_seg_mesh_widget, area='left', name='Move Seg Mesh')
-
+        if seg_mesh_exists:
+            self.move_seg_mesh_widget = MoveSegMeshWidget(self.viewer, self.functions['move_seg_mesh_label'], self.functions['reset_segmentation_mesh'])
+            self.viewer.window.add_dock_widget(self.move_seg_mesh_widget, area='left', name='Move Seg Mesh')
+            self.color_semantic_label_button = CustomButtonWidget("Color Semantic Mask", '', self.color_semantic_mask)
+        else: 
+            self.color_semantic_label_button = None
+            
         self.zyx_widget = ZYXNavigationWidget(self.config, self.functions['update_and_reload_data'], self.viewer)
         self.viewer.window.add_dock_widget(self.zyx_widget, area='left')
 
@@ -275,7 +279,6 @@ class VesuviusGUI:
         self.padding_button = CustomButtonWidget("Toggle Padding Context", self.get_key_string('toggle_contextual_view'), self.toggle_padding_context)
         self.cut_plane_button = CustomButtonWidget("Cut Label at Plane", self.get_key_string('cut_label_at_oblique_plane'), self.cut_label_at_plane_gui)
         self.components_button = CustomButtonWidget("Connected Components", self.get_key_string('connected_components'), self.run_connected_components)
-        self.color_semantic_label_button = CustomButtonWidget("Color Semantic Mask", '', self.color_semantic_mask)
         self.save_button = CustomButtonWidget("Save Labels", self.get_key_string('save_labels'), self.save_labels_button)
         color_picker_widget = ColorPickerWidget(self.viewer)
 
