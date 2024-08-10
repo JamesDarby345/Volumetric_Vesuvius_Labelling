@@ -55,13 +55,11 @@ class DataManager:
         self.load_voxelized_segmentation_mesh_data()
             
     def load_voxelized_segmentation_mesh_data(self):
-        saved_mesh_file_path = os.path.join(os.getcwd(), 'output', 
-                                            f'volumetric_labels_{self.cube_config.scroll_name}', 
-                                            f"{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}",
-                                            f"{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}_zyx_{self.cube_config.chunk_size}_chunk_{self.cube_config.scroll_name}_vol_seg-mesh.nrrd")
+        saved_mesh_file_path = self.get_seg_mesh_file_path(self.cube_config.z, self.cube_config.y, self.cube_config.x)
 
         if os.path.exists(saved_mesh_file_path):
             self.voxelized_segmentation_mesh_data, _ = nrrd.read(saved_mesh_file_path)
+            print(f"Loaded segmentation mesh from {saved_mesh_file_path}")
         else:
             current_directory = os.getcwd()
             root_directory = f"{current_directory}/data/manual_sheet_segmentation/{self.cube_config.scroll_name}"
@@ -489,6 +487,12 @@ class DataManager:
             await self._save_nrrd_async(file_path, data, header)
         finally: 
             self.is_saving = False
+    
+    async def save_seg_mesh_data_async(self, z, y, x, data):
+        file_path = self.get_seg_mesh_file_path(z, y, x)
+        header = self.create_default_nrrd_header(data, z, y, x)
+        await self._save_nrrd_async(file_path, data, header)
+        print(f"Saved segmentation mesh to {file_path}")
 
     async def save_raw_data_async(self, z, y, x):
         file_path = self.get_raw_data_file_path(z, y, x)
@@ -528,6 +532,10 @@ class DataManager:
     def get_raw_data_file_path(self,z,y,x,):
         return os.path.join(self.get_output_path(z,y,x), 
                             f"{z}_{y}_{x}_zyx_{self.cube_config.chunk_size}_chunk_{self.cube_config.scroll_name}_vol_raw.nrrd")
+    
+    def get_seg_mesh_file_path(self, z, y, x):
+        return os.path.join(self.get_output_path(z, y, x), 
+                            f"{z}_{y}_{x}_zyx_{self.cube_config.chunk_size}_chunk_{self.cube_config.scroll_name}_seg_mesh.nrrd")
 
     def get_output_path(self, z,y,x):
         return os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.cube_config.scroll_name}', 

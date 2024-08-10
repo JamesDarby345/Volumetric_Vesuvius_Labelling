@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QPushButton, QLabel, 
                              QVBoxLayout, QScrollArea, QSizePolicy, QSpinBox, QColorDialog,
-                             QLineEdit, QGridLayout)
+                             QLineEdit, QGridLayout, QComboBox)
 from PyQt5.QtCore import Qt
 from helper import *
 
@@ -31,6 +31,11 @@ class MoveSegMeshWidget(QWidget):
         title_label = QLabel("Move Segmentation Mesh")
         layout.addWidget(title_label)
 
+        # Dropdown menu for move type
+        self.move_type_combo = QComboBox()
+        self.move_type_combo.addItems(["Selected Label", "All Labels"])
+        layout.addWidget(self.move_type_combo)
+
         # dz, dy, dx inputs
         for axis in ['dz', 'dy', 'dx']:
             axis_layout = QHBoxLayout()
@@ -43,7 +48,7 @@ class MoveSegMeshWidget(QWidget):
             layout.addLayout(axis_layout)
 
         # Move button
-        move_button = QPushButton("Move Selected Label")
+        move_button = QPushButton("Move Label(s)")
         move_button.clicked.connect(self.move_label)
         layout.addWidget(move_button)
 
@@ -51,7 +56,8 @@ class MoveSegMeshWidget(QWidget):
         dz = self.dz_spinbox.value()
         dy = self.dy_spinbox.value()
         dx = self.dx_spinbox.value()
-        self.move_function(self.viewer, dz, dy, dx)
+        move_all = self.move_type_combo.currentText() == "All Labels"
+        self.move_function(self.viewer, dz, dy, dx, move_all)
 
 class ZYXNavigationWidget(QWidget):
     def __init__(self, config, update_function, viewer):
