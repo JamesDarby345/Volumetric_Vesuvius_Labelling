@@ -11,11 +11,11 @@ cube_info:
   main_label_layer_name: 'papyrus' # 'papyrus' or 'ink', sets the main label layer for functions to act on.
   # Note that Scroll 1 alignment origin is 2000,2000,2000, other scrolls use 0,0,0
   align_coordinates: True # whether or not to enforce coordinates aligned to chunk size for label editing
-  nrrd_cube_path: '' # Leave blank if using default nrrd cube location, or a zarr for raw data
+  nrrd_cube_path: '' # Leave blank if using default nrrd cube location (data/nrrd_cubes/scroll_name), or a zarr for raw data
+  voxelised_mesh_path: '' # Leave blank if using the default voxelized mesh location (data/manual_sheet_segmentation/scroll_name)
   raw_data_zarr_path: '' # Ex: '/path/to/file.zarr'
   ink_pred_zarr_path: '' # Keep empty if not using ink prediction zarrs
-  create_papyrus_mask_if_not_provided: True # Create papyrus mask if not provided, turn off if just interested in ink
-
+  create_papyrus_mask_if_not_provided: True # Create papyrus mask if not provided, turn off if just interested in ink labels for faster loading
 
   # Variables to align raw data and ink pred axis
   # if both raw data and ink pred zarrs of the same size are used, 

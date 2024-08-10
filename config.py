@@ -153,6 +153,13 @@ class CubeConfig:
         if nrrd_cube_path is None or nrrd_cube_path == '':
             nrrd_cube_path = os.path.join(os.getcwd(), 'data', 'nrrd_cubes', self.cube_info.get('scroll_name', '')) 
         return nrrd_cube_path
+    
+    @property
+    def voxelised_mesh_path(self):
+        voxelised_mesh_path = self.cube_info.get('voxelised_mesh_path', '')
+        if voxelised_mesh_path is None or voxelised_mesh_path == '':
+            voxelised_mesh_path = os.path.join(os.getcwd(), 'data', 'manual_sheet_segmentation', self.cube_info.get('scroll_name', ''))
+        return voxelised_mesh_path
 
     @property
     def raw_data_zarr_path(self):

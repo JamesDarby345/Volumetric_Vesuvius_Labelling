@@ -28,7 +28,8 @@ class DataManager:
         self.label_header = None
         self.raw_data_header = None
         self.raw_data_zarr_shape = None
-        self.nrrd_cube_path = self.cube_config.nrrd_cube_path
+        # self.nrrd_cube_path = self.cube_config.nrrd_cube_path
+        # self.voxelized_mesh_path = self.cube_config.voxelised_mesh_path
         self.is_saving = False
 
         self.load_data()
@@ -43,7 +44,8 @@ class DataManager:
         self.original_ink_pred_data = None
         self.voxelized_segmentation_mesh_data = None
         self.label_header = None
-        self.nrrd_cube_path = self.cube_config.nrrd_cube_path
+        # self.nrrd_cube_path = self.cube_config.nrrd_cube_path
+        # self.voxelized_mesh_path = self.cube_config.voxelised_mesh_path
 
         # Reload all data
         self.load_data()
@@ -61,9 +63,7 @@ class DataManager:
             self.voxelized_segmentation_mesh_data, _ = nrrd.read(saved_mesh_file_path)
             print(f"Loaded segmentation mesh from {saved_mesh_file_path}")
         else:
-            current_directory = os.getcwd()
-            root_directory = f"{current_directory}/data/manual_sheet_segmentation/{self.cube_config.scroll_name}"
-            self.voxelized_segmentation_mesh_data = self.process_b2nd_files(root_directory, self.cube_config.z_num, self.cube_config.y_num, self.cube_config.x_num, self.cube_config.chunk_size, self.cube_config.voxelized_mesh_pad_amount)
+            self.voxelized_segmentation_mesh_data = self.process_b2nd_files(self.cube_config.voxelised_mesh_path, self.cube_config.z_num, self.cube_config.y_num, self.cube_config.x_num, self.cube_config.chunk_size, self.cube_config.voxelized_mesh_pad_amount)
 
     def load_raw_data(self):
         if not self.cube_config.using_raw_data_zarr:
