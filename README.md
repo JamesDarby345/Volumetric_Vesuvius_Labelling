@@ -53,7 +53,7 @@ Link to emel ryan's 3d ink detection zarrs: https://dl.ash2txt.org/community-upl
 Specify the path to the ink detection zarr in the config with the ink_pred_zarr_path and change the main label layer name to 'ink'. If you are using the matching raw data zarr file, the axis should automatically align, if you are using nrrd cubes, you will have to specify the correct axis order with the raw_data_axis_order: 'zyx' and ink_pred_label_order: 'zyx' variables so the ink label and raw data align. Additionally if you are using the zarr, you can set the chunk_size to be larger so you can view more of the volume. If the ink detection volume uses a value range, set the ink_threshold value to provide a cutoff. Additionally you may want to set create_papyrus_mask_if_not_provided to False so papyrus labels arent created, which slows down load times. Scroll 1 8um scan letters are approximately 400 voxels tall. 
 
 ### How to use for volumetric labelling
-Workflow for manual & semi automated volumetric cube labelling : https://docs.google.com/document/d/
+Workflow for manual & semi automated volumetric cube labelling : https://docs.google.com/document/d/1NVG1L2rLySrzstuXc2LvHFkdnJ0PZx1nwPMcYrs1fHM/edit?usp=sharing
 
 ### How to use for 3d ink detection label inspection and refinement
 Workflow to view the 3d ink detection labels and manually refine them: https://docs.google.com/document/d/1i-v9Qv2bNEm7CP5vXZHKkSAPX_S1nIStXoC2frAkg3E/edit?usp=sharing
