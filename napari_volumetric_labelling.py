@@ -996,7 +996,7 @@ def dilate_labels(viewer):
     print(msg)
 
 @thread_worker
-def save_labels_worker(viewer, z, y, x, papyrus_labels, ink_labels):
+def save_labels_worker(viewer, z, y, x, papyrus_labels, ink_labels, seg_mesh_labels):
     msg = 'save labels'
     viewer.status = msg
     print(msg)
@@ -1014,13 +1014,15 @@ def save_labels_worker(viewer, z, y, x, papyrus_labels, ink_labels):
 
         # Save papyrus label data
         if papyrus_labels is not None:
-            print(f"papyrus_labels shape: {papyrus_labels.shape}")
             if papyrus_labels.shape[0] != config.cube_config.chunk_size:
                 papyrus_labels_unpadded = unpad_array(papyrus_labels, config.cube_config.chunk_size)
             else:
                 papyrus_labels_unpadded = papyrus_labels
-            print(f"papyrus_labels shape after unpad: {papyrus_labels_unpadded.shape}")
             tasks.append(data_manager.save_label_data_async(z, y, x, papyrus_labels_unpadded, 'vol'))
+
+        # Save segmentation mesh data
+        if seg_mesh_labels is not None:
+            tasks.append(data_manager.save_seg_mesh_data_async(z, y, x, seg_mesh_labels))
 
         # Save raw data if it hasn't been saved before
         tasks.append(data_manager.save_raw_data_async(z, y, x))
@@ -1033,7 +1035,7 @@ def save_labels_worker(viewer, z, y, x, papyrus_labels, ink_labels):
 
     return data_manager.get_output_path(z, y, x)
 
-def save_labels(viewer, z=None, y=None, x=None, should_show_popup=True, papyrus_labels=None, ink_labels=None):
+def save_labels(viewer, z=None, y=None, x=None, should_show_popup=True, papyrus_labels=None, ink_labels=None, seg_mesh_labels=None):
     if data_manager.is_saving:
         show_popup("A save operation is in progress. Please wait a few seconds before navigating to a new cube.")
         return False
@@ -1049,8 +1051,10 @@ def save_labels(viewer, z=None, y=None, x=None, should_show_popup=True, papyrus_
         papyrus_labels = viewer.layers[papyrus_label_name].data
     if ink_labels is None and ink_label_name in viewer.layers:
         ink_labels = viewer.layers[ink_label_name].data
+    if seg_mesh_labels is None and seg_mesh_name in viewer.layers:
+        seg_mesh_labels = viewer.layers[seg_mesh_name].data
 
-    worker = save_labels_worker(viewer, z, y, x, papyrus_labels, ink_labels)
+    worker = save_labels_worker(viewer, z, y, x, papyrus_labels, ink_labels, seg_mesh_labels)
     
     if should_show_popup:
         worker.started.connect(lambda: show_popup("Saving has started. You will be notified when it's complete."))
@@ -1060,6 +1064,38 @@ def save_labels(viewer, z=None, y=None, x=None, should_show_popup=True, papyrus_
     worker.errored.connect(lambda error: print(f"Error during saving: {error}"))
 
     worker.start()
+
+def reset_segmentation_mesh(viewer):
+    global data_manager, config
+
+    # Reload the segmentation mesh data from b2nd files
+    current_directory = os.getcwd()
+    root_directory = f"{current_directory}/data/manual_sheet_segmentation/{config.cube_config.scroll_name}"
+    new_seg_mesh_data = data_manager.process_b2nd_files(
+        root_directory, 
+        config.cube_config.z_num, 
+        config.cube_config.y_num, 
+        config.cube_config.x_num, 
+        config.cube_config.chunk_size, 
+        config.cube_config.voxelized_mesh_pad_amount
+    )
+
+    # Update the data_manager with the new segmentation mesh data
+    data_manager.voxelized_segmentation_mesh_data = new_seg_mesh_data
+
+    # Update the viewer layer
+    if seg_mesh_name in viewer.layers:
+        viewer.layers[seg_mesh_name].data = new_seg_mesh_data
+    else:
+        seg_mesh_layer = viewer.add_labels(new_seg_mesh_data, name=seg_mesh_name)
+    
+    offset = np.array([config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount])
+    viewer.layers[seg_mesh_name].translate = -offset
+    viewer.layers[seg_mesh_name].opacity = 1
+    viewer.layers[seg_mesh_name].colormap = get_direct_label_colormap()
+
+    print("Segmentation mesh has been reset to the original b2nd data.")
+    show_info("Segmentation mesh has been reset.")
 
 def connected_components_preview(viewer):
     if cc_preview_name in viewer.layers and viewer.layers[cc_preview_name].visible:
@@ -1112,16 +1148,15 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
     new_y = str(new_y).zfill(5)
     new_x = str(new_x).zfill(5)
 
-    # Save the current labels, before updating the coordinates
+    # Save the current labels, including segmentation mesh, before updating the coordinates
     if label_3d_name in viewer.layers:
         update_label_from_3d_edit_layer(viewer)
-    papyrus_labels = None
-    if papyrus_label_name in viewer.layers:
-        papyrus_labels = viewer.layers[papyrus_label_name].data
-    ink_labels = None
-    if ink_label_name in viewer.layers:
-        ink_labels = viewer.layers[ink_label_name].data
-    save_labels(viewer, config.cube_config.z, config.cube_config.y, config.cube_config.x, should_show_popup=False, papyrus_labels=papyrus_labels, ink_labels=ink_labels)
+    papyrus_labels = viewer.layers[papyrus_label_name].data if papyrus_label_name in viewer.layers else None
+    ink_labels = viewer.layers[ink_label_name].data if ink_label_name in viewer.layers else None
+    seg_mesh_labels = viewer.layers[seg_mesh_name].data if seg_mesh_name in viewer.layers else None
+    
+    save_labels(viewer, config.cube_config.z, config.cube_config.y, config.cube_config.x, 
+                should_show_popup=False, papyrus_labels=papyrus_labels, ink_labels=ink_labels, seg_mesh_labels=seg_mesh_labels)
     
     config.cube_config.update_coordinates(new_z, new_y, new_x)
 
@@ -1147,6 +1182,18 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
     elif ink_label_name in viewer.layers:
             viewer.layers.remove(ink_label_name)
 
+    if data_manager.voxelized_segmentation_mesh_data is not None:
+        if seg_mesh_name in viewer.layers:
+            viewer.layers[seg_mesh_name].data = data_manager.voxelized_segmentation_mesh_data
+        else:
+            seg_mesh_layer = viewer.add_labels(data_manager.voxelized_segmentation_mesh_data, name=seg_mesh_name)
+        offset = np.array([config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount])
+        viewer.layers[seg_mesh_name].translate = -offset
+        viewer.layers[seg_mesh_name].opacity = 1
+        viewer.layers[seg_mesh_name].colormap = get_direct_label_colormap()
+    elif seg_mesh_name in viewer.layers:
+        viewer.layers.remove(seg_mesh_name)
+
     if label_3d_name in viewer.layers:
         viewer.layers.remove(label_3d_name)
     if cc_preview_name in viewer.layers:
@@ -1160,13 +1207,13 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
         viewer.layers[main_label_name].contour = 1
         viewer.layers[main_label_name].opacity = 1
         viewer.layers[main_label_name].blending = 'opaque'
-        # viewer.layers[main_label_name].color_mode = 'auto'
         viewer.layers[main_label_name].colormap = get_direct_label_colormap()
     elif data_name in viewer.layers:
         viewer.layers.selection.active = viewer.layers[data_name]
 
     #Update the GUI with the new coordinates
-    gui.zyx_widget.zyx_input.setText(f"{new_z}_{new_y}_{new_x}")
+    # gui.zyx_widget.zyx_input.setText(f"{new_z}_{new_y}_{new_x}")
+    return True
 
 # Create a dictionary of functions to pass to the GUI
 functions_dict = {
@@ -1181,6 +1228,7 @@ functions_dict = {
     'save_labels': save_labels,
     'update_and_reload_data': lambda z, y, x: update_and_reload_data(viewer, data_manager, config, z, y, x),
     'move_seg_mesh_label': lambda viewer, dz, dy, dx, move_all: move_seg_mesh_label(viewer, dz, dy, dx, move_all),
+    'reset_segmentation_mesh': reset_segmentation_mesh,
 }
 
 def update_global_erase_slice_width(value):

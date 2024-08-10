@@ -490,7 +490,7 @@ class DataManager:
     
     async def save_seg_mesh_data_async(self, z, y, x, data):
         file_path = self.get_seg_mesh_file_path(z, y, x)
-        header = self.create_default_nrrd_header(data, z, y, x)
+        header = DataManager.create_default_nrrd_header(data, z, y, x)
         await self._save_nrrd_async(file_path, data, header)
         print(f"Saved segmentation mesh to {file_path}")
 

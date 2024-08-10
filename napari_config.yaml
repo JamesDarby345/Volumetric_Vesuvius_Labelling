@@ -1,16 +1,16 @@
 cube_info:
-  #cube z,y,x coords to load correct raw data & mask cubes
+  # cube z,y,x coords to load correct raw data & mask cubes
   zyx: '00000_00000_00000'
-  scroll_name: 's1' #dont use '_' in scroll name
+  scroll_name: 's1' # dont use '_' in scroll name
   chunk_size: 256
   pad_amount: 100
-  smoother_labels: True #Use smoother labels by default
+  smoother_labels: True # Use smoother labels by default
   brush_size: 4
-  cc_min_size: 300 #minimum number of voxels of an object to not be filtered out by connected components
+  cc_min_size: 300 # minimum number of voxels of an object to not be filtered out by connected components
 
   main_label_layer_name: 'papyrus' # 'papyrus' or 'ink', sets the main label layer for functions to act on.
-  #Note that Scroll 1 alignment origin is 2000,2000,2000, other scrolls use 0,0,0
-  align_coordinates: True #whether or not to enforce coordinates aligned to chunk size for label editing
+  # Note that Scroll 1 alignment origin is 2000,2000,2000, other scrolls use 0,0,0
+  align_coordinates: True # whether or not to enforce coordinates aligned to chunk size for label editing
   nrrd_cube_path: '' # Leave blank if using default nrrd cube location, or a zarr for raw data
   raw_data_zarr_path: '' # Ex: '/path/to/file.zarr'
   ink_pred_zarr_path: '' # Keep empty if not using ink prediction zarrs
@@ -24,7 +24,7 @@ cube_info:
   ink_threshold: 150 # threshold value to binarize ink prediction zarr values for display as labels
   author: '' # optional author name to add to metadata
   factor: 1.0 
-  edit_chunk_size: 256 #chunk size to use when focussing on a chunk for label editing
+  edit_chunk_size: 256 # chunk size to use when focussing on a chunk for label editing
 
 # Napari default keybinds will overwrite the custom keybinds in some modes
 # Thus, it is recommended to not use the default keybinds for custom keybinds

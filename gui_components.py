@@ -17,10 +17,11 @@ def pick_color(viewer):
         viewer.window._qt_viewer.canvas.bgcolor = color_tuple
 
 class MoveSegMeshWidget(QWidget):
-    def __init__(self, viewer, move_function):
+    def __init__(self, viewer, move_function, reset_function):
         super().__init__()
         self.viewer = viewer
         self.move_function = move_function
+        self.reset_function = reset_function
         self.setup_ui()
 
     def setup_ui(self):
@@ -52,12 +53,22 @@ class MoveSegMeshWidget(QWidget):
         move_button.clicked.connect(self.move_label)
         layout.addWidget(move_button)
 
+        # Reset button
+        reset_button = QPushButton("Reset Segmentation Mesh")
+        reset_button.clicked.connect(self.confirm_reset_mesh)
+        layout.addWidget(reset_button)
+
     def move_label(self):
         dz = self.dz_spinbox.value()
         dy = self.dy_spinbox.value()
         dx = self.dx_spinbox.value()
         move_all = self.move_type_combo.currentText() == "All Labels"
         self.move_function(self.viewer, dz, dy, dx, move_all)
+
+    def confirm_reset_mesh(self):
+        message = "Are you sure you want to reset the segmentation mesh?\n\nThis action will reload the mesh from the b2nd files and cannot be undone."
+        if confirm_popup(message):
+            self.reset_function(self.viewer)
 
 class ZYXNavigationWidget(QWidget):
     def __init__(self, config, update_function, viewer):
@@ -251,7 +262,7 @@ class VesuviusGUI:
 
     def setup_gui(self):
         # Create custom button widgets
-        self.move_seg_mesh_widget = MoveSegMeshWidget(self.viewer, self.functions['move_seg_mesh_label'])
+        self.move_seg_mesh_widget = MoveSegMeshWidget(self.viewer, self.functions['move_seg_mesh_label'], self.functions['reset_segmentation_mesh'])
         self.viewer.window.add_dock_widget(self.move_seg_mesh_widget, area='left', name='Move Seg Mesh')
 
         self.zyx_widget = ZYXNavigationWidget(self.config, self.functions['update_and_reload_data'], self.viewer)
