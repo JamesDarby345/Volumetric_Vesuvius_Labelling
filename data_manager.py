@@ -417,73 +417,12 @@ class DataManager:
         mask = data > threshold
         return mask
 
-    def check_and_update_header(self, header, z,y,x):
-        updated = False
-        
-        if 'space' not in header or header['space'] != 'left-posterior-superior':
-            header['space'] = 'left-posterior-superior'
-            updated = True
-
-        if 'space directions' not in header or header['space directions'].shape != (3, 3):
-            header['space directions'] = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=float)
-            updated = True
-
-        if 'kinds' not in header or len(header['kinds']) != 3:
-            header['kinds'] = ['domain', 'domain', 'domain']
-            updated = True
-
-        if 'endian' not in header:
-            header['endian'] = 'little'
-            updated = True
-
-        if 'space origin' not in header:
-            header['space origin'] = [float(z), float(y), float(x)]
-            updated = True
-
-        return header, updated
-
     async def save_label_data_async(self, z,y,x, data, label_type):
         print(f"Saving label data for {z}_{y}_{x}")
         self.is_saving = True
         try:
             file_path = self.get_label_file_path(z,y,x, label_type)
-            
-            if label_type == 'vol':
-                header = self.label_header
-                if header is not None:
-                    # Parse the existing timestamps
-                    if 'saved_timestamps' in header:
-                        try:
-                            saved_timestamps = ast.literal_eval(header['saved_timestamps'])
-                        except:
-                            saved_timestamps = []
-                    else:
-                        saved_timestamps = []
-                    
-                    # Append the new timestamp
-                    saved_timestamps.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                    
-                    # Update the header with the new list of timestamps
-                    header['saved_timestamps'] = str(saved_timestamps)
-                    
-                    # Do the same for open_timestamps
-                    if 'open_timestamps' in header:
-                        try:
-                            open_timestamps = ast.literal_eval(header['open_timestamps'])
-                        except:
-                            open_timestamps = []
-                    else:
-                        open_timestamps = []
-                    header['open_timestamps'] = str(open_timestamps)
-
-                    header, updated = self.check_and_update_header(header, z, y, x)
-
-                    
-                    # print("header changes at",z,y,x)
-                    header = dict(header)
-            else:
-                header = self.create_default_nrrd_header(data, z, y, x)
-
+            header = DataManager.create_default_nrrd_header(data, z, y, x, 'gzip')
             await self._save_nrrd_async(file_path, data, header)
         finally: 
             self.is_saving = False
@@ -499,22 +438,10 @@ class DataManager:
         
         if not os.path.exists(file_path):
             print("saving raw data at path: ", file_path)
-
             header = DataManager.create_default_nrrd_header(self.raw_data, z, y, x)
-
-            # Save the NRRD file with the updated header
             await self._save_nrrd_async(file_path, self.raw_data, header)
         else:
-            # If the file already exists, we might want to update its header
-            try:
-                print(f"Updating existing file header: {file_path}")
-                existing_data, existing_header = nrrd.read(file_path)
-                print(f"Existing header: {existing_header}")
-                header, updated = self.check_and_update_header(existing_header, z, y, x)
-                if updated:
-                    await self._save_nrrd_async(file_path, existing_data, header)
-            except Exception as e:
-                print(f"Error updating existing file header: {e}")
+            print(f"Raw data nrrd already exists at {file_path}")
 
     async def _save_nrrd_async(self, file_path, data, header=None):
         def save_task():
@@ -541,7 +468,7 @@ class DataManager:
         return os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.cube_config.scroll_name}', 
                             f'{z}_{y}_{x}')
     
-    def create_default_nrrd_header(data,z=0,y=0,x=0):
+    def create_default_nrrd_header(data,z=0,y=0,x=0,encoding='raw'):
         header = {
             'type': data.dtype.name,
             'dimension': data.ndim,
@@ -550,7 +477,7 @@ class DataManager:
             'space directions': np.eye(data.ndim).tolist(),
             'kinds': ['domain'] * data.ndim,
             'endian': 'little',
-            'encoding': 'raw',
+            'encoding': encoding,
             'space origin': [float(z), float(y), float(x)]  # Use a list of floats
         }
         return header

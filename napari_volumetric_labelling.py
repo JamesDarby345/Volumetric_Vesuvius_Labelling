@@ -1216,8 +1216,6 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
     elif data_name in viewer.layers:
         viewer.layers.selection.active = viewer.layers[data_name]
 
-    #Update the GUI with the new coordinates
-    # gui.zyx_widget.zyx_input.setText(f"{new_z}_{new_y}_{new_x}")
     return True
 
 # Create a dictionary of functions to pass to the GUI
