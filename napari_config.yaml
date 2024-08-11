@@ -25,8 +25,7 @@ cube_info:
   ink_pred_label_order: 'zyx'
   ink_threshold: 150 # threshold value to binarize ink prediction zarr values for display as labels
   use_custom_colormap: True # Use custom colormap for better label colors (limited to 183 colors)
-  author: '' # optional author name to add to metadata
-  factor: 1.0 
+  factor: 1.0 #semantic mask scale factor
   edit_chunk_size: 256 # chunk size to use when focussing on a chunk for label editing
 
 # Napari default keybinds will overwrite the custom keybinds in some modes

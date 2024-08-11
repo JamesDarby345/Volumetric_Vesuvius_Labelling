@@ -28,10 +28,6 @@ class MoveSegMeshWidget(QWidget):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        # Title
-        title_label = QLabel("Move Segmentation Mesh")
-        layout.addWidget(title_label)
-
         # Dropdown menu for move type
         self.move_type_combo = QComboBox()
         self.move_type_combo.addItems(["Selected Label", "All Labels"])
@@ -214,6 +210,11 @@ class VesuviusGUI:
         # Set smaller spacing between widgets
         layout.setSpacing(8)
         
+        # Add dropdown menu for erode/dilate label selection
+        self.label_selection_combo = QComboBox()
+        self.label_selection_combo.addItems(["Erode/Dilate All Labels", "Erode/Dilate Selected Label", "Erode/Dilate All Labels No Warning", "Erode/Dilate Selected Label No Warning"])
+        layout.addWidget(self.label_selection_combo)
+        
         buttons = [self.dilate_button, self.erode_button, self.full_view_button, self.plane_cut_button, 
                 self.cut_plane_button, self.padding_button, self.components_button, self.color_semantic_label_button, self.save_button]
         
@@ -270,7 +271,7 @@ class VesuviusGUI:
             self.color_semantic_label_button = None
             
         self.zyx_widget = ZYXNavigationWidget(self.config, self.functions['update_and_reload_data'], self.viewer)
-        self.viewer.window.add_dock_widget(self.zyx_widget, area='left')
+        self.viewer.window.add_dock_widget(self.zyx_widget, area='left', name='ZYX Navigation')
 
         self.dilate_button = CustomButtonWidget("Dilate Labels", self.get_key_string('dilate_labels'), self.dilate_labels_gui)
         self.erode_button = CustomButtonWidget("Erode Labels", self.get_key_string('erode_labels'), self.erode_labels_gui)

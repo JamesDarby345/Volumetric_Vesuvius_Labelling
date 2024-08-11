@@ -15,6 +15,33 @@ from scipy import ndimage
 
 from scipy.spatial import cKDTree
 
+def filter_and_reassign_labels(label_data, cc_min_size):
+    """
+    Filter out labels smaller than cc_min_size and reassign remaining labels
+    starting from 1 and incrementing by 1.
+
+    Parameters:
+    label_data (numpy.ndarray): Input label data
+    cc_min_size (int): Minimum size for a label to be kept
+
+    Returns:
+    numpy.ndarray: Filtered and reassigned label data
+    """
+    # Get unique labels and their sizes
+    unique_labels, label_sizes = np.unique(label_data, return_counts=True)
+
+    # Create a mapping for labels to keep (excluding background label 0)
+    labels_to_keep = unique_labels[np.logical_and(label_sizes >= cc_min_size, unique_labels != 0)]
+    
+    # Create a new array for reassigned labels
+    new_label_data = np.zeros_like(label_data)
+
+    # Reassign labels
+    for new_label, old_label in enumerate(labels_to_keep, start=1):
+        new_label_data[label_data == old_label] = new_label
+
+    return new_label_data
+
 @numba.jit(nopython=True)
 def assign_values(papyrus_non_zero, seg_non_zero, indices, seg_mesh_data, updated_papyrus):
     for i, papyrus_coord in enumerate(papyrus_non_zero):

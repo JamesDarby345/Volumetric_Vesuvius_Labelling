@@ -5,13 +5,10 @@ import nrrd
 import numpy as np
 import zarr
 from dask import array as da
-from datetime import datetime
-from collections import defaultdict
 from scipy.ndimage import gaussian_filter
 from skimage.morphology import remove_small_objects, remove_small_holes
 from skimage.filters import threshold_otsu
 import asyncio
-import ast
 from scipy import ndimage
 import blosc2
 from helper import *
@@ -28,8 +25,6 @@ class DataManager:
         self.label_header = None
         self.raw_data_header = None
         self.raw_data_zarr_shape = None
-        # self.nrrd_cube_path = self.cube_config.nrrd_cube_path
-        # self.voxelized_mesh_path = self.cube_config.voxelised_mesh_path
         self.is_saving = False
 
         self.load_data()
@@ -44,8 +39,6 @@ class DataManager:
         self.original_ink_pred_data = None
         self.voxelized_segmentation_mesh_data = None
         self.label_header = None
-        # self.nrrd_cube_path = self.cube_config.nrrd_cube_path
-        # self.voxelized_mesh_path = self.cube_config.voxelised_mesh_path
 
         # Reload all data
         self.load_data()
@@ -86,7 +79,6 @@ class DataManager:
         print("Creating Papyrus Label from thresholded raw data, may take a few seconds...")
         nrrd.write(mask_file_path, self.original_label_data)
         self.original_label_data, self.label_header = nrrd.read(mask_file_path)
-        self.label_data = self.original_label_data
 
     def load_label_data(self):
         output_folder_path = os.path.join(os.getcwd(), 'output', f'volumetric_labels_{self.cube_config.scroll_name}')
@@ -97,34 +89,35 @@ class DataManager:
         nrrd_cube_folder_path = os.path.join(self.cube_config.nrrd_cube_path, f'{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}')
         mask_file_path = os.path.join(nrrd_cube_folder_path, f'{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}_mask.nrrd')
 
-        if os.path.exists(saved_label_file_path):
-            print(f"Loading label data from saved label {saved_label_file_path}")
-            self.label_data, self.label_header = nrrd.read(saved_label_file_path)
+        # Load or create original label data
         if os.path.exists(mask_file_path):
-            if self.label_data is None:
-                self.label_data, self.label_header = nrrd.read(mask_file_path)
-                self.original_label_data = self.label_data
-            else:
-                self.original_label_data, self.label_header = nrrd.read(mask_file_path)
-            if self.label_data.shape[0] != self.cube_config.chunk_size:
-                self.create_papyrus_mask(nrrd_cube_folder_path, mask_file_path)
-            else:
-                print(f"Loaded label data from provided mask {mask_file_path}")
-        elif self.label_data is None and self.cube_config.create_papyrus_mask_if_not_provided:
+            print(f"Loading original label data from mask file {mask_file_path}")
+            self.original_label_data, self.label_header = nrrd.read(mask_file_path)
+        elif self.cube_config.create_papyrus_mask_if_not_provided:
+            print("Creating papyrus mask as original label data")
             self.create_papyrus_mask(nrrd_cube_folder_path, mask_file_path)
+        else:
+            print("No mask file found and create_papyrus_mask_if_not_provided is False.")
+            self.original_label_data = None
 
-        if self.label_header is not None:
-            print(self.label_header)
-            self.label_header = defaultdict(list, self.label_header)
-            for key in ['saved_timestamps', 'open_timestamps']:
-                self.label_header[key] = self.ensure_list(self.label_header[key])
-            self.label_header['open_timestamps'].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            if 'author' not in self.label_header and self.cube_config.author is not None and self.cube_config.author != '':
-                self.label_header['author'] = self.cube_config.author
+        # Load edited label data if it exists, otherwise use original label data
+        if os.path.exists(saved_label_file_path):
+            print(f"Loading edited label data from saved label {saved_label_file_path}")
+            self.label_data, self.label_header = nrrd.read(saved_label_file_path)
+        elif self.original_label_data is not None:
+            print("No saved label file found. Using original label data for editing.")
+            self.label_data = self.original_label_data.copy()
+        else:
+            print("No label data available for editing.")
+            self.label_data = None
 
-        if self.cube_config.smoother_labels and self.original_label_data is not None:
-            self.original_label_data = pad_array(self.original_label_data, self.cube_config.chunk_size)
-            self.label_data = pad_array(self.label_data, self.cube_config.chunk_size)
+        if self.cube_config.smoother_labels:
+            if self.original_label_data is not None:
+                self.original_label_data = pad_array(self.original_label_data, self.cube_config.chunk_size)
+            if self.label_data is not None:
+                self.label_data = pad_array(self.label_data, self.cube_config.chunk_size)
+
+
 
     def load_ink_pred_data(self):
         saved_ink_pred_file_path = os.path.join(os.getcwd(), 'output', 

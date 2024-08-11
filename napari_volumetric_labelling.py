@@ -73,6 +73,7 @@ pad_state = False
 
 data = data_manager.raw_data
 label_data = data_manager.label_data
+original_data = data_manager.original_label_data
 ink_pred_data = data_manager.original_ink_pred_data
 voxelized_segmentation_mesh_data = data_manager.voxelized_segmentation_mesh_data
 
@@ -106,6 +107,8 @@ else:
 image_layer =  viewer.add_image(data, colormap='gray', name=data_name)
 if label_data is not None:
     papyrus_label_layer = viewer.add_labels(label_data, name=papyrus_label_name)
+if original_data is not None:
+    test_layer = viewer.add_labels(original_data, name="Original Semantic Mask")
 if ink_pred_data is not None:
     ink_labels_layer = viewer.add_labels(ink_pred_data, name=ink_label_name)
 if voxelized_segmentation_mesh_data is not None:
@@ -312,12 +315,11 @@ def toggle_show_selected_label(viewer):
         viewer.layers[label_3d_name].show_selected_label = not viewer.layers[label_3d_name].show_selected_label
 
 # Add an empty labels layer for the flood fill result
-flood_fill_layer = viewer.add_labels(np.zeros_like(data), name=ff_name)
+flood_fill_layer = None
 
 def flood_fill(viewer, distance=20):
-    msg = 'flood fill'
-    viewer.status = msg
-    print(msg)
+    if flood_fill_layer == None:
+        flood_fill_layer = viewer.add_labels(np.zeros_like(data), name=ff_name)
     # Get the cursor position in data coordinates
     cursor_position = viewer.cursor.position
     cursor_position = tuple(int(np.round(coord)) for coord in cursor_position)
@@ -412,6 +414,25 @@ def process_value(value, data, erode, erosion_iterations, dilation_iterations, o
     
     return result
 
+def erode_dilate_selected_label(data, label_value, erode=True, iterations=1, original_mask=None):
+    mask = data == label_value
+    other_labels_mask = (data != 0) & (data != label_value)
+    if erode:
+        result = binary_erosion(mask, iterations=iterations)
+    else:
+        temp_dilated = numba_dilation_3d_labels(mask, iterations)
+
+        # Ensure dilation doesn't expand into other labels
+        result = temp_dilated & ~other_labels_mask
+
+        # If original_mask is provided, ensure dilation doesn't exceed it
+        if original_mask is not None:
+            result = result & original_mask
+    new_data = data.copy()
+    new_data[mask] = 0  # Remove the original label
+    new_data[result] = label_value  # Apply the new label
+    return new_data
+
 @thread_worker
 def erode_dilate_labels_worker(data, erode=True, erosion_iterations=1, dilation_iterations=1, original_label_data=data_manager.original_label_data):
     unique_values = np.unique(data[(data > 0) & (data < 254)])
@@ -438,6 +459,71 @@ def erode_dilate_labels(viewer, data, erode=True, erosion_iterations=1, dilation
     worker.yielded.connect(update_progress)
     worker.returned.connect(on_complete)
     worker.start()
+
+def erode_labels(viewer):
+    selected_option = gui.label_selection_combo.currentText()
+    active_layer = viewer.layers.selection.active
+
+    if "Selected Label" in selected_option:
+        if not isinstance(active_layer, napari.layers.Labels) or active_layer.selected_label == 0:
+            show_popup("Please select a valid label on an active label layer.")
+            return
+
+    if "No Warning" not in selected_option:
+        if "Selected Label" in selected_option:
+            msg = f"Are you sure you want to erode the selected label ({active_layer.selected_label})? This operation cannot be undone."
+        else:
+            msg = "Are you sure you want to erode all labels? This operation cannot be undone."
+
+        response = confirm_popup(msg)
+        if response != QMessageBox.Yes:
+            print('eroding labels cancelled')
+            return 
+
+    if "Selected Label" in selected_option:
+        new_data = erode_dilate_selected_label(active_layer.data, active_layer.selected_label, erode=True)
+        active_layer.data = new_data
+    else:
+        erode_dilate_labels(viewer, viewer.layers[main_label_name].data)
+    
+    viewer.layers[main_label_name].refresh()
+
+    #update 3d label layer if it is visible
+    if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+        cut_label_at_oblique_plane(viewer, switch=False)
+
+def dilate_labels(viewer):
+    selected_option = gui.label_selection_combo.currentText()
+    active_layer = viewer.layers.selection.active
+
+    if "Selected Label" in selected_option:
+        if not isinstance(active_layer, napari.layers.Labels) or active_layer.selected_label == 0:
+            show_popup("Please select a valid label on an active label layer.")
+            return
+
+    if "No Warning" not in selected_option:
+        if "Selected Label" in selected_option:
+            msg = f"Are you sure you want to dilate the selected label ({active_layer.selected_label})? This operation cannot be undone."
+        else:
+            msg = "Are you sure you want to dilate all labels? This operation cannot be undone. It will only dilate up to the borders of the original mask file."
+
+        response = confirm_popup(msg)
+        if response != QMessageBox.Yes:
+            print('dilating labels cancelled')
+            return 
+
+    if "Selected Label" in selected_option:
+        original_mask = data_manager.original_label_data != 0
+        new_data = erode_dilate_selected_label(active_layer.data, active_layer.selected_label, erode=False, original_mask=original_mask)
+        active_layer.data = new_data
+    else:
+        erode_dilate_labels(viewer, viewer.layers[main_label_name].data, erode=False)
+    
+    viewer.layers[main_label_name].refresh()
+
+    #update 3d label layer if it is visible
+    if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+        cut_label_at_oblique_plane(viewer, switch=False)
 
 def shift_prev_erase_plane(direction):
     global erase_slice_width, prev_erase_plane_info_var
@@ -943,60 +1029,6 @@ def toggle_contextual_view(viewer):
 
         pad_state = True
 
-def erode_labels(viewer):
-    global pad_state
-    msg = 'eroding labels'
-    viewer.status = msg
-    print(msg) 
-    if not pad_state:
-        msg = "Are you sure you want to erode the labels? This operation cannot be undone."
-        response = confirm_popup(msg)
-        if response != QMessageBox.Yes:
-            print('eroding labels cancelled')
-            return 
-        erode_dilate_labels(viewer, viewer.layers[main_label_name].data)
-        viewer.layers[main_label_name].refresh()
-
-        #update 3d label layer if it is visible
-        if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-            cut_label_at_oblique_plane(viewer, switch=False)
-    else:
-        msg = f'please remove contextual padding before eroding labels'
-        show_popup(msg)
-        viewer.status = msg
-        print(msg)
-        return
-    msg = 'eroding labels finished'
-    viewer.status = msg
-    print(msg)
-
-def dilate_labels(viewer):
-    global pad_state
-    msg = 'dilating labels'
-    viewer.status = msg
-    print(msg)
-    if not pad_state:
-        msg = "Are you sure you want to dilate the labels? This operation cannot be undone. It will only dilate up to the borders of the original mask file."
-        response = confirm_popup(msg)
-        if response != QMessageBox.Yes:
-            print('dilating labels cancelled')
-            return 
-        erode_dilate_labels(viewer, viewer.layers[main_label_name].data, erode=False)
-        viewer.layers[main_label_name].refresh()
-
-        #update 3d label layer if it is visible
-        if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-            cut_label_at_oblique_plane(viewer, switch=False)
-    else:
-        msg = f'please remove contextual padding before dilating labels'
-        show_popup(msg)
-        viewer.status = msg
-        print(msg)
-        return
-    msg = 'dilating labels finished'
-    viewer.status = msg
-    print(msg)
-
 @thread_worker
 def save_labels_worker(viewer, z, y, x, papyrus_labels, ink_labels, seg_mesh_labels):
     msg = 'save labels'
@@ -1142,6 +1174,10 @@ def bind_hotkeys(viewer, hotkey_config, module=None, overwrite=True):
                 viewer.bind_key(keys, func, overwrite=overwrite)
             except (ValueError, TypeError) as e:
                 print(f"Error binding key '{keys}' to function '{func_name}': {str(e)}")
+
+def cleanup_labels(viewer):
+    viewer.layers[main_label_name].data = filter_and_reassign_labels(viewer.layers[main_label_name].data, config.cube_config.cc_min_size)
+
 
 def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, new_chunk_size=None):
     if data_manager.is_saving:
