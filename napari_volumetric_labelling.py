@@ -133,6 +133,45 @@ def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labe
     
 
 # Functions:
+def isolate_selected_label(viewer):
+    global previous_label_3d_data, manual_changes_mask, pad_state, pad_amount
+
+    if label_3d_name in viewer.layers:
+        # If 3D edit layer exists, apply changes and remove it
+        update_label_from_3d_edit_layer(viewer)
+        viewer.layers.remove(label_3d_name)
+        viewer.layers[main_label_name].visible = True
+        viewer.layers[main_label_name].refresh()
+        print(f"Changes applied to {main_label_name} layer and 3D edit layer removed.")
+    else:
+        if viewer.layers.selection.active is not None:
+            active_mode = viewer.layers.selection.active.mode
+        else:
+            active_mode = 'pan_zoom'
+
+        # Update main_label_name layer from label_3d_name layer if it exists
+        update_label_from_3d_edit_layer(viewer)
+
+        # Get the selected label
+        selected_label = viewer.layers[main_label_name].selected_label
+        if selected_label == 0:
+            print("No label selected. Please select a label first.")
+            return
+
+        # Create a copy of the label data and isolate the selected label
+        new_label_data = viewer.layers[main_label_name].data.copy()
+        new_label_data[new_label_data != selected_label] = 0
+
+        # Setup the label_3d_name layer
+        new_label_layer = setup_label_3d_layer(viewer, new_label_data, active_mode)
+        new_label_layer.selected_label = selected_label
+
+        # Store the current state of the label_3d_name layer for future comparison
+        previous_label_3d_data = new_label_data.copy()
+
+        viewer.layers[main_label_name].visible = False
+        new_label_layer.visible = True
+
 def toggle_preserve_labels(viewer):
     active_layer = viewer.layers.selection.active
     if isinstance(active_layer, napari.layers.Labels):
@@ -440,9 +479,6 @@ def process_value(value, data, erode, erosion_iterations, dilation_iterations, o
             # Create a mask of all other values
             other_values_mask = (data != 0) & (data != value)
             
-            # Dilate the structure
-            # dilated_structure = binary_dilation(structure_mask, iterations=dilation_iterations)
-            
             dilated_structure = numba_dilation_3d_labels(structure_mask, dilation_iterations)
             # Remove areas where dilation intersects with other values
             final_dilated_structure = dilated_structure & ~other_values_mask
@@ -457,9 +493,13 @@ def process_value(value, data, erode, erosion_iterations, dilation_iterations, o
     
     return result
 
-def erode_dilate_selected_label(data, label_value, erode=True, iterations=1, original_mask=None):
+def erode_dilate_selected_label(data, label_value, erode=True, iterations=1, original_mask=None, main_label_data=None):
     mask = data == label_value
-    other_labels_mask = (data != 0) & (data != label_value)
+    if main_label_data is None:
+        other_labels_mask = (data != 0) & (data != label_value)
+    else:
+        other_labels_mask = (main_label_data != 0) & (main_label_data != label_value)
+
     if erode:
         result = binary_erosion(mask, iterations=iterations)
     else:
@@ -532,8 +572,8 @@ def erode_labels(viewer):
     viewer.layers[main_label_name].refresh()
 
     #update 3d label layer if it is visible
-    if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-        cut_label_at_oblique_plane(viewer, switch=False)
+    # if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+    #     cut_label_at_oblique_plane(viewer, switch=False)
 
 def dilate_labels(viewer):
     selected_option = gui.label_selection_combo.currentText()
@@ -557,7 +597,8 @@ def dilate_labels(viewer):
 
     if "Selected Label" in selected_option:
         original_mask = data_manager.original_label_data != 0
-        new_data = erode_dilate_selected_label(active_layer.data, active_layer.selected_label, erode=False, original_mask=original_mask)
+        main_label_data = viewer.layers[main_label_name].data
+        new_data = erode_dilate_selected_label(active_layer.data, active_layer.selected_label, erode=False, original_mask=original_mask, main_label_data=main_label_data)
         active_layer.data = new_data
     else:
         erode_dilate_labels(viewer, viewer.layers[main_label_name].data, erode=False)
@@ -565,8 +606,8 @@ def dilate_labels(viewer):
     viewer.layers[main_label_name].refresh()
 
     #update 3d label layer if it is visible
-    if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-        cut_label_at_oblique_plane(viewer, switch=False)
+    # if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+    #     cut_label_at_oblique_plane(viewer, switch=False)
 
 def shift_prev_erase_plane(direction):
     global erase_slice_width, prev_erase_plane_info_var
