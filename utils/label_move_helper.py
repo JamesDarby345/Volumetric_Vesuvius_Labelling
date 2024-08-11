@@ -30,5 +30,5 @@ def process_files(source_folder):
             print(f"Moved {filename} to {new_folder_path}")
 
 # Usage
-source_folder = "output/volumetric_labels_s1/!dump"
+source_folder = "../output/volumetric_labels_s1/!dump"
 process_files(source_folder)

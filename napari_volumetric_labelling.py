@@ -6,6 +6,7 @@ from gui_components import VesuviusGUI
 from napari.layers import Image
 from PyQt5.QtCore import QTimer
 from scipy.ndimage import binary_erosion
+from scipy import ndimage
 from qtpy.QtWidgets import QMessageBox
 from qtpy.QtCore import QTimer
 from napari.qt.threading import thread_worker
@@ -132,6 +133,56 @@ def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labe
     
 
 # Functions:
+def toggle_preserve_labels(viewer):
+    active_layer = viewer.layers.selection.active
+    if isinstance(active_layer, napari.layers.Labels):
+        active_layer.preserve_labels = not active_layer.preserve_labels
+        status = "enabled" if active_layer.preserve_labels else "disabled"
+ 
+def toggle_show_selected_label(viewer):
+    active_layer = viewer.layers.selection.active
+    if isinstance(active_layer, napari.layers.Labels):
+        active_layer.show_selected_label = not active_layer.show_selected_label
+        status = "enabled" if active_layer.show_selected_label else "disabled"
+
+def fill_holes_morphological_closing(viewer, closing_iterations=1):
+    active_layer = viewer.layers.selection.active
+    if not isinstance(active_layer, napari.layers.Labels):
+        show_popup("Please select a label layer.")
+        return
+
+    selected_label = active_layer.selected_label
+    if selected_label == 0:
+        show_popup("Please select a label to fill holes.")
+        return
+    
+    msg = f"Are you sure you want to fill holes in the selected label ({selected_label})? This operation cannot be undone, consider saving first"
+    response = confirm_popup(msg)
+    if response != QMessageBox.Yes:
+        print('filling holes cancelled')
+        return 
+
+    data = active_layer.data.copy()
+    label_mask = data == selected_label
+
+    # Create a structure for 3D connectivity (26-connected)
+    struct = ndimage.generate_binary_structure(3, 3)
+
+    # Perform morphological closing
+    closed_mask = ndimage.binary_closing(label_mask, structure=struct, iterations=closing_iterations)
+
+    # Apply the closed mask back to the data
+    data[closed_mask] = selected_label
+
+    # Update the layer data
+    active_layer.data = data
+    active_layer.refresh()
+
+    if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+        cut_label_at_oblique_plane(viewer, switch=False)
+
+    show_popup("Holes filled successfully.")
+
 def move_seg_mesh_label(viewer, dz=1, dy=0, dx=0, move_all=False):
     if seg_mesh_name not in viewer.layers:
         print(f"Error: {seg_mesh_name} layer not found in the viewer.")
@@ -305,14 +356,6 @@ def increase_brush_size(viewer):
     print(msg)
     brush_size += 1
     apply_global_brush_size(viewer)
-
-def toggle_show_selected_label(viewer):
-    msg = 'toggle show selected label'
-    viewer.status = msg
-    print(msg)
-    viewer.layers[main_label_name].show_selected_label = not viewer.layers[main_label_name].show_selected_label
-    if label_3d_name in viewer.layers:
-        viewer.layers[label_3d_name].show_selected_label = not viewer.layers[label_3d_name].show_selected_label
 
 # Add an empty labels layer for the flood fill result
 flood_fill_layer = None
@@ -1177,6 +1220,7 @@ def bind_hotkeys(viewer, hotkey_config, module=None, overwrite=True):
 
 def cleanup_labels(viewer):
     viewer.layers[main_label_name].data = filter_and_reassign_labels(viewer.layers[main_label_name].data, config.cube_config.cc_min_size)
+    show_popup("Labels clean up finished")
 
 
 def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, new_chunk_size=None):
@@ -1258,6 +1302,7 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
 functions_dict = {
     'erode_labels': erode_labels,
     'dilate_labels': dilate_labels,
+    'fill_holes': fill_holes_morphological_closing,
     'full_label_view': full_label_view,
     'switch_to_plane': switch_to_plane_view,
     'toggle_contextual_view': toggle_contextual_view,
@@ -1309,6 +1354,8 @@ if config.cube_config.smoother_labels:
         toggle_smooth_labels(viewer, viewer.layers[ink_label_name], on=True)
     if seg_mesh_name in viewer.layers:
         toggle_smooth_labels(viewer, viewer.layers[seg_mesh_name], on=True)
+    if "Original Semantic Mask" in viewer.layers:
+        toggle_smooth_labels(viewer, viewer.layers["Original Semantic Mask"], on=True)
 
 viewer.window.add_dock_widget(toggle_smooth_labels)
 

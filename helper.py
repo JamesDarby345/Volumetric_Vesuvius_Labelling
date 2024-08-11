@@ -17,28 +17,36 @@ from scipy.spatial import cKDTree
 
 def filter_and_reassign_labels(label_data, cc_min_size):
     """
-    Filter out labels smaller than cc_min_size and reassign remaining labels
-    starting from 1 and incrementing by 1.
+    Filter out small disconnected components within each label and reassign
+    remaining labels starting from 1 and incrementing by 1.
 
     Parameters:
     label_data (numpy.ndarray): Input label data
-    cc_min_size (int): Minimum size for a label to be kept
+    cc_min_size (int): Minimum size for a connected component to be kept
 
     Returns:
     numpy.ndarray: Filtered and reassigned label data
     """
-    # Get unique labels and their sizes
-    unique_labels, label_sizes = np.unique(label_data, return_counts=True)
+    unique_labels = np.unique(label_data)
+    unique_labels = unique_labels[unique_labels != 0]  # Exclude background
 
-    # Create a mapping for labels to keep (excluding background label 0)
-    labels_to_keep = unique_labels[np.logical_and(label_sizes >= cc_min_size, unique_labels != 0)]
-    
-    # Create a new array for reassigned labels
     new_label_data = np.zeros_like(label_data)
+    new_label = 1
 
-    # Reassign labels
-    for new_label, old_label in enumerate(labels_to_keep, start=1):
-        new_label_data[label_data == old_label] = new_label
+    for label in unique_labels:
+        label_mask = label_data == label
+        labeled_components, _ = ndimage.label(label_mask)
+        
+        valid_component_mask = np.zeros_like(label_mask, dtype=bool)
+        
+        for component in range(1, labeled_components.max() + 1):
+            component_mask = labeled_components == component
+            if np.sum(component_mask) >= cc_min_size:
+                valid_component_mask |= component_mask
+
+        if np.any(valid_component_mask):
+            new_label_data[valid_component_mask] = new_label
+            new_label += 1
 
     return new_label_data
 

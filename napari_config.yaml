@@ -57,6 +57,8 @@ customizable_hotkeys:
   switch_to_plane_view: ["Shift-c","g"]
   full_label_view: "v"
   toggle_contextual_view: "t"
+  toggle_preserve_labels: ""
+  toggle_show_selected_label: ""
   connected_components_preview: "r"
 
   #l is defaulted for switching to data layer because it is near o

@@ -179,6 +179,35 @@ class CustomButtonWidget(QWidget):
         
         self.setLayout(layout)
 
+class FillHolesWidget(QWidget):
+    def __init__(self, fill_holes_function):
+        super().__init__()
+        self.fill_holes_function = fill_holes_function
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
+        # Closing iterations input
+        closing_iterations_layout = QHBoxLayout()
+        closing_iterations_layout.addWidget(QLabel("Closing Iterations:"))
+        self.closing_iterations_spinbox = QSpinBox()
+        self.closing_iterations_spinbox.setMinimum(1)
+        self.closing_iterations_spinbox.setMaximum(10)
+        self.closing_iterations_spinbox.setValue(1)
+        closing_iterations_layout.addWidget(self.closing_iterations_spinbox)
+        layout.addLayout(closing_iterations_layout)
+
+        # Fill Holes button
+        self.fill_holes_button = QPushButton("Fill Holes")
+        self.fill_holes_button.clicked.connect(self.fill_holes)
+        layout.addWidget(self.fill_holes_button)
+
+    def fill_holes(self):
+        iterations = self.closing_iterations_spinbox.value()
+        self.fill_holes_function(iterations)
+
 class VesuviusGUI:
     def __init__(self, viewer, functions_dict, update_global_erase_slice_width, config, main_label_layer_name='Papyrus Labels', seg_mesh_exists=False):
         self.viewer = viewer
@@ -301,6 +330,9 @@ class VesuviusGUI:
 
         instruction_scroll_area = self.create_instruction_scroll_area()
         self.viewer.window.add_dock_widget(instruction_scroll_area, area='right')
+        
+        self.fill_holes_widget = FillHolesWidget(lambda iterations: self.functions['fill_holes'](self.viewer, iterations))
+        self.viewer.window.add_dock_widget(self.fill_holes_widget, area='right', name='Fill Holes')
 
     def update_erase_slice_width(self, value):
         self.erase_slice_width = value
@@ -353,6 +385,10 @@ class VesuviusGUI:
 
     def erode_labels_gui(self):
         self.functions['erode_labels'](self.viewer)
+
+    def fill_holes(self):
+        iterations = self.closing_iterations_spinbox.value()
+        self.functions['fill_holes'](self.viewer, iterations)
 
     def toggle_full_label_view(self):
         self.functions['full_label_view'](self.viewer)
