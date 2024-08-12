@@ -33,14 +33,14 @@ cube_info:
 # Keys with default functions include:
 # x,y,z,o,p,[,],-,=,m,p,1,2,3,4,5
 customizable_hotkeys:
+  isolate_selected_label: "Shift-r"
   toggle_labels_visibility: ["s","/"]
   toggle_data_visibility: ["w","."]
   erase_mode_toggle: ["Shift-w"]
-  move_mode: ["Shift-s"]
   #------------------------
   #arrow keys have 2d default behaviour, these extend behaviour to 3d plane shifting
-  shift_data_left_and_recut_3d_label: ["Left","Shift-q"]
-  shift_data_right_and_recut_3d_label: ["Right","Shift-e"]
+  shift_data_left_and_recut_3d_label: ["Shift-q"]
+  shift_data_right_and_recut_3d_label: ["Shift-e"]
   shift_data_left_fast_and_recut_3d_label: "Shift-Left"
   shift_data_right_fast_and_recut_3d_label: "Shift-Right"
   #------------------------
@@ -57,9 +57,10 @@ customizable_hotkeys:
   switch_to_plane_view: ["Shift-c","g"]
   full_label_view: "v"
   toggle_contextual_view: "t"
-  toggle_preserve_labels: ""
-  toggle_show_selected_label: ""
+  toggle_preserve_labels: "Shift-s"
+  toggle_show_selected_label: "Shift-x"
   connected_components_preview: "r"
+  # fill_holes: "f"
 
   #l is defaulted for switching to data layer because it is near o
   #as o for off-axis plane slice is a napari default (hard to change) 
@@ -72,17 +73,17 @@ customizable_hotkeys:
 
   #------------------------
   #less often used keybinds, may have gui button, or became less useful for defaults/3d
-  erode_labels: "i"
+  move_mode: ""
+  erode_labels: ""
   dilate_labels: "u"
-  connected_components: "'"
-  #TODO: document these new keybinds
+  cleanup_labels: "i"
+  connected_components: "m"
   reset_plane_to_default: "b"
   reset_plane_view_to_default: "Shift-b"
   align_plane_with_selected_label: "n"
   align_cube_with_selected_label: "Shift-n"
-
   save_labels: "h"
-  decrease_brush_size: "Shift-z"
-  increase_brush_size: "Shift-x"
-  toggle_show_selected_label: ""
+  decrease_brush_size: ""
+  increase_brush_size: ""
+  label_picker: ""
   set_corner_view: ""

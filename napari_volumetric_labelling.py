@@ -143,6 +143,7 @@ def isolate_selected_label(viewer):
         viewer.layers[main_label_name].visible = True
         viewer.layers[main_label_name].refresh()
         print(f"Changes applied to {main_label_name} layer and 3D edit layer removed.")
+        viewer.layers.selection.active = viewer.layers[main_label_name]
     else:
         if viewer.layers.selection.active is not None:
             active_mode = viewer.layers.selection.active.mode
@@ -217,8 +218,8 @@ def fill_holes_morphological_closing(viewer, closing_iterations=1):
     active_layer.data = data
     active_layer.refresh()
 
-    if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-        cut_label_at_oblique_plane(viewer, switch=False)
+    # if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
+    #     cut_label_at_oblique_plane(viewer, switch=False)
 
     show_popup("Holes filled successfully.")
 
@@ -484,7 +485,8 @@ def process_value(value, data, erode, erosion_iterations, dilation_iterations, o
             final_dilated_structure = dilated_structure & ~other_values_mask
             
             # Ensure dilation doesn't exceed the original label data boundaries
-            final_dilated_structure = final_dilated_structure & (original_label_data != 0)
+            if original_label_data is not None:
+                final_dilated_structure = final_dilated_structure & (original_label_data != 0)
             
             # Apply the result
             result[final_dilated_structure] = value
@@ -530,7 +532,8 @@ def erode_dilate_labels_worker(data, erode=True, erosion_iterations=1, dilation_
     return result
 
 def erode_dilate_labels(viewer, data, erode=True, erosion_iterations=1, dilation_iterations=1):
-    worker = erode_dilate_labels_worker(data, erode, erosion_iterations, dilation_iterations)
+    original_label_data = data_manager.original_label_data
+    worker = erode_dilate_labels_worker(data, erode, erosion_iterations, dilation_iterations, original_label_data=original_label_data)
     
     def update_progress(progress):
         show_info(f"Processing: {progress:.0%}")
@@ -571,10 +574,6 @@ def erode_labels(viewer):
     
     viewer.layers[main_label_name].refresh()
 
-    #update 3d label layer if it is visible
-    # if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-    #     cut_label_at_oblique_plane(viewer, switch=False)
-
 def dilate_labels(viewer):
     selected_option = gui.label_selection_combo.currentText()
     active_layer = viewer.layers.selection.active
@@ -604,10 +603,6 @@ def dilate_labels(viewer):
         erode_dilate_labels(viewer, viewer.layers[main_label_name].data, erode=False)
     
     viewer.layers[main_label_name].refresh()
-
-    #update 3d label layer if it is visible
-    # if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-    #     cut_label_at_oblique_plane(viewer, switch=False)
 
 def shift_prev_erase_plane(direction):
     global erase_slice_width, prev_erase_plane_info_var
@@ -1305,6 +1300,14 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
             viewer.add_labels(data_manager.original_ink_pred_data, name=ink_label_name)
     elif ink_label_name in viewer.layers:
             viewer.layers.remove(ink_label_name)
+
+    if data_manager.original_label_data is not None:
+        if "Original Semantic Mask" in viewer.layers:
+            viewer.layers["Original Semantic Mask"].data = data_manager.original_label_data
+        else:
+            viewer.add_labels(data_manager.original_label_data, name="Original Semantic Mask")
+    elif "Original Semantic Mask" in viewer.layers:
+        viewer.layers.remove("Original Semantic Mask")
 
     if data_manager.voxelized_segmentation_mesh_data is not None:
         if seg_mesh_name in viewer.layers:

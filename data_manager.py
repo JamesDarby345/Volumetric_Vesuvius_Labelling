@@ -89,35 +89,46 @@ class DataManager:
         nrrd_cube_folder_path = os.path.join(self.cube_config.nrrd_cube_path, f'{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}')
         mask_file_path = os.path.join(nrrd_cube_folder_path, f'{self.cube_config.z}_{self.cube_config.y}_{self.cube_config.x}_mask.nrrd')
 
-        # Load or create original label data
-        if os.path.exists(mask_file_path):
-            print(f"Loading original label data from mask file {mask_file_path}")
-            self.original_label_data, self.label_header = nrrd.read(mask_file_path)
-        elif self.cube_config.create_papyrus_mask_if_not_provided:
-            print("Creating papyrus mask as original label data")
-            self.create_papyrus_mask(nrrd_cube_folder_path, mask_file_path)
-        else:
-            print("No mask file found and create_papyrus_mask_if_not_provided is False.")
+        # Generate the threshold mask
+        if self.cube_config.create_papyrus_mask_if_not_provided:
+            threshold_mask = self.threshold_mask(self.raw_data, factor=self.cube_config.factor).astype(np.uint8)
+            # Set original_label_data to the threshold mask
+            self.original_label_data = threshold_mask
+        else: 
+            print("Creating papyrus mask is disabled.")
+            threshold_mask = np.zeros(self.raw_data.shape, dtype=np.uint8)
             self.original_label_data = None
+        
+        
 
-        # Load edited label data if it exists, otherwise use original label data
+        # Load or create mask file if it doesn't exist
+        if not os.path.exists(mask_file_path):
+            if self.cube_config.create_papyrus_mask_if_not_provided:
+                print("Creating papyrus mask as no mask file exists")
+                os.makedirs(nrrd_cube_folder_path, exist_ok=True)
+                nrrd.write(mask_file_path, threshold_mask)
+            else:
+                print("No mask file found and create_papyrus_mask_if_not_provided is False.")
+
+        # Load edited label data if it exists
         if os.path.exists(saved_label_file_path):
             print(f"Loading edited label data from saved label {saved_label_file_path}")
             self.label_data, self.label_header = nrrd.read(saved_label_file_path)
-        elif self.original_label_data is not None:
-            print("No saved label file found. Using original label data for editing.")
-            self.label_data = self.original_label_data.copy()
+        # If no edited data, try to load the mask file
+        elif os.path.exists(mask_file_path):
+            print(f"Loading label data from mask file {mask_file_path}")
+            self.label_data, self.label_header = nrrd.read(mask_file_path)
+        # If no mask file, use the threshold mask
         else:
-            print("No label data available for editing.")
-            self.label_data = None
+            print("No saved label or mask file found. Using threshold mask for editing.")
+            self.label_data = threshold_mask
+            self.label_header = self.create_default_nrrd_header(self.label_data, self.cube_config.z, self.cube_config.y, self.cube_config.x)
 
         if self.cube_config.smoother_labels:
             if self.original_label_data is not None:
                 self.original_label_data = pad_array(self.original_label_data, self.cube_config.chunk_size)
             if self.label_data is not None:
                 self.label_data = pad_array(self.label_data, self.cube_config.chunk_size)
-
-
 
     def load_ink_pred_data(self):
         saved_ink_pred_file_path = os.path.join(os.getcwd(), 'output', 
