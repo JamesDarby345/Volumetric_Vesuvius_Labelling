@@ -596,7 +596,8 @@ def dilate_labels(viewer):
 
     if "Selected Label" in selected_option:
         original_mask = data_manager.original_label_data != 0
-        main_label_data = viewer.layers[main_label_name].data
+        # main_label_data = viewer.layers[main_label_name].data
+        main_label_data = active_layer.data
         new_data = erode_dilate_selected_label(active_layer.data, active_layer.selected_label, erode=False, original_mask=original_mask, main_label_data=main_label_data)
         active_layer.data = new_data
     else:
