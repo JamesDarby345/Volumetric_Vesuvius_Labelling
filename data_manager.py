@@ -98,8 +98,6 @@ class DataManager:
             print("Creating papyrus mask is disabled.")
             threshold_mask = np.zeros(self.raw_data.shape, dtype=np.uint8)
             self.original_label_data = None
-        
-        
 
         # Load or create mask file if it doesn't exist
         if not os.path.exists(mask_file_path):
@@ -354,8 +352,12 @@ class DataManager:
             origin = self.read_origin_file(origin_file)
             chunk = self.read_b2nd_chunk(b2nd_file, origin, z, y, x, chunk_size, padding)
             if chunk is not None:
-                split_chunks, chunk_i = self.split_connected_components(chunk, chunk_i)
-                chunks.extend(split_chunks)
+                expected_shape = (chunk_size + 2*padding,) * 3
+                if chunk.shape == expected_shape:
+
+                    split_chunks, chunk_i = self.split_connected_components(chunk, chunk_i)
+                    chunks.extend(split_chunks)
+                    print(chunk.shape, b2nd_file, origin, z,y,x)
 
         result_array = np.stack(chunks, axis=0) if chunks else np.array([])
         return self.combine_labeled_chunks(result_array)
