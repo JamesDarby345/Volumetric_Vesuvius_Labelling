@@ -3,6 +3,7 @@ To provide custom tooling and extensions to the Napari 3d viewer that will help 
 
 ## Features:
 -2D & 3D volumetric label editing<br>
+-Sheet midline push and nearest voxel assignment for semi-automated labelling<br>
 -Responsive 3D Erasing<br>
 -Segmentation mesh label coloring for semi-automated voumetric labelling<br>
 -3D Chunk View to limit view to relevant context<br>
