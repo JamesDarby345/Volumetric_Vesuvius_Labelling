@@ -666,6 +666,16 @@ def edit_label_color(active_label):
     else:
         print("Color selection cancelled")
 
+def reset_colormap():
+    original_colormap = get_slicer_colormap()
+    current_directory = os.getcwd()
+    colormap_file = os.path.join(current_directory, 'colormap.yaml')
+    
+    with open(colormap_file, 'w') as file:
+        yaml.dump(original_colormap, file)
+    
+    print("Colormap reset to original Slicer colormap")
+    return get_direct_label_colormap()
 
 def get_direct_label_colormap():
     colormap = load_or_create_colormap()
