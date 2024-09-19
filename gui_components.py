@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QPushButton, QLabel,
                              QLineEdit, QGridLayout, QComboBox)
 from PyQt5.QtCore import Qt
 from helper import *
+import napari
 
 MIN_BUTTON_WIDTH = 150
 
@@ -328,11 +329,16 @@ class VesuviusGUI:
 
         self.viewer.window.add_dock_widget(main_container, area='right')
 
-        instruction_scroll_area = self.create_instruction_scroll_area()
-        self.viewer.window.add_dock_widget(instruction_scroll_area, area='right')
+        # instruction_scroll_area = self.create_instruction_scroll_area()
+        # self.viewer.window.add_dock_widget(instruction_scroll_area, area='right')
         
         self.fill_holes_widget = FillHolesWidget(lambda iterations: self.functions['fill_holes'](self.viewer, iterations))
         self.viewer.window.add_dock_widget(self.fill_holes_widget, area='right', name='Fill Holes')
+
+        # Add the new Edit Label Color button
+        self.edit_color_button = CustomButtonWidget("Edit Label Color", '', self.edit_label_color)
+        
+        main_layout.addWidget(self.edit_color_button)
 
     def update_erase_slice_width(self, value):
         self.erase_slice_width = value
@@ -410,6 +416,27 @@ class VesuviusGUI:
 
     def save_labels_button(self):
         self.functions['save_labels'](self.viewer, self.config.cube_config.z, self.config.cube_config.y, self.config.cube_config.x)
+
+    def edit_label_color(self):
+        active_layer = self.viewer.layers.selection.active
+        if isinstance(active_layer, napari.layers.Labels):
+            selected_label = active_layer.selected_label
+            if selected_label >= 0:
+                edit_label_color(selected_label)
+                # Get the updated colormap
+                updated_colormap = get_direct_label_colormap()
+                
+                # Update all label layers with the new colormap
+                for layer in self.viewer.layers:
+                    if isinstance(layer, napari.layers.Labels):
+                        layer.colormap = updated_colormap
+                        layer.refresh()
+                
+                show_popup("Label color updated and applied to all label layers.")
+            else:
+                show_popup("Please select a positive label value to edit its color.")
+        else:
+            show_popup("Please select a label layer to edit colors.")
 
     def get_instruction_text(self):
         def key_to_string(key):

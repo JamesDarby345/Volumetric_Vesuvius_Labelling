@@ -14,6 +14,7 @@ from pathlib import Path
 from scipy import ndimage
 
 from scipy.spatial import cKDTree
+import os
 
 def filter_and_reassign_labels(label_data, cc_min_size):
     """
@@ -623,13 +624,55 @@ def get_slicer_colormap():
         183: [185, 232, 61, 255],
     }
 
+def load_or_create_colormap():
+    current_directory = os.getcwd()
+    colormap_file = os.path.join(current_directory, 'colormap.yaml')
+    
+    if os.path.exists(colormap_file):
+        with open(colormap_file, 'r') as file:
+            colormap = yaml.safe_load(file)
+    else:
+        colormap = get_slicer_colormap()
+        with open(colormap_file, 'w') as file:
+            yaml.dump(colormap, file)
+    
+    return colormap
+
+from PyQt5.QtWidgets import QColorDialog
+from PyQt5.QtGui import QColor
+
+def edit_label_color(active_label):
+    colormap = load_or_create_colormap()
+    
+    current_color = colormap.get(active_label, [255, 255, 255, 255])
+    initial_color = QColor(*current_color)
+    
+    color_dialog = QColorDialog()
+    color_dialog.setCurrentColor(initial_color)
+    
+    if color_dialog.exec_():
+        new_color = color_dialog.currentColor()
+        new_color_rgba = [new_color.red(), new_color.green(), new_color.blue(), new_color.alpha()]
+        
+        colormap[active_label] = new_color_rgba
+        
+        current_directory = os.getcwd()
+        colormap_file = os.path.join(current_directory, 'colormap.yaml')
+        
+        with open(colormap_file, 'w') as file:
+            yaml.dump(colormap, file)
+        
+        print(f"Updated color for label {active_label}: {new_color_rgba}")
+    else:
+        print("Color selection cancelled")
+
 
 def get_direct_label_colormap():
-    slicer_colormap = get_slicer_colormap()
+    colormap = load_or_create_colormap()
     
     # Normalize colors to 0-1 range
     normalized_colormap = defaultdict(lambda: np.array([0, 0, 0, 0]))
-    for k, color in slicer_colormap.items():
+    for k, color in colormap.items():
         normalized_colormap[k] = np.array(color) / 255
     
     # Add None key with a default color (e.g., transparent black)

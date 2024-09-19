@@ -5,3 +5,4 @@ __pycache__
 /napari_examples
 local_napari_config.yaml
 ink_det_config.yaml
+colormap.yaml
