@@ -180,44 +180,16 @@ class CustomButtonWidget(QWidget):
         
         self.setLayout(layout)
 
-class FillHolesWidget(QWidget):
-    def __init__(self, fill_holes_function):
-        super().__init__()
-        self.fill_holes_function = fill_holes_function
-        self.setup_ui()
-
-    def setup_ui(self):
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-
-        # Closing iterations input
-        closing_iterations_layout = QHBoxLayout()
-        closing_iterations_layout.addWidget(QLabel("Closing Iterations:"))
-        self.closing_iterations_spinbox = QSpinBox()
-        self.closing_iterations_spinbox.setMinimum(1)
-        self.closing_iterations_spinbox.setMaximum(10)
-        self.closing_iterations_spinbox.setValue(1)
-        closing_iterations_layout.addWidget(self.closing_iterations_spinbox)
-        layout.addLayout(closing_iterations_layout)
-
-        # Fill Holes button
-        self.fill_holes_button = QPushButton("Fill Holes")
-        self.fill_holes_button.clicked.connect(self.fill_holes)
-        layout.addWidget(self.fill_holes_button)
-
-    def fill_holes(self):
-        iterations = self.closing_iterations_spinbox.value()
-        self.fill_holes_function(iterations)
-
 class VesuviusGUI:
-    def __init__(self, viewer, functions_dict, update_global_erase_slice_width, config, main_label_layer_name='Papyrus Labels', seg_mesh_exists=False):
+    def __init__(self, viewer, functions, update_erase_width_callback, config, main_label_layer_name, seg_mesh_exists=False):
         self.viewer = viewer
-        self.functions = functions_dict
-        self.update_global_erase_slice_width = update_global_erase_slice_width
+        self.functions = functions
+        self.update_erase_width_callback = update_erase_width_callback
         self.erase_slice_width = 30
         self.config = config
         self.main_label_layer_name = main_label_layer_name
         self.move_seg_mesh_widget = None 
+        self.tunnel_fill_button = None
         self.setup_gui(seg_mesh_exists)
 
     def get_key_string(self, func):
@@ -246,7 +218,8 @@ class VesuviusGUI:
         layout.addWidget(self.label_selection_combo)
         
         buttons = [self.dilate_button, self.erode_button, self.full_view_button, self.plane_cut_button, 
-                self.cut_plane_button, self.padding_button, self.components_button, self.color_semantic_label_button, self.save_button]
+                self.cut_plane_button, self.padding_button, self.components_button, 
+                self.color_semantic_label_button, self.save_button, self.tunnel_fill_button]
         
         for button in buttons:
             layout.addWidget(button)
@@ -313,6 +286,8 @@ class VesuviusGUI:
         self.save_button = CustomButtonWidget("Save Labels", self.get_key_string('save_labels'), self.save_labels_button)
         color_picker_widget = ColorPickerWidget(self.viewer)
 
+        self.tunnel_fill_button = CustomButtonWidget("Tunnel Fill", '', self.morphological_tunnel_fill)
+        
         button_container = self.create_button_container()
         erase_width_layout = self.create_erase_width_input()
 
@@ -327,14 +302,14 @@ class VesuviusGUI:
         main_layout.addLayout(erase_width_layout)
         main_layout.addWidget(color_picker_widget)
 
+        # Add the tunnel fill button
+        main_layout.addWidget(self.tunnel_fill_button)
+
         self.viewer.window.add_dock_widget(main_container, area='right')
 
         # instruction_scroll_area = self.create_instruction_scroll_area()
         # self.viewer.window.add_dock_widget(instruction_scroll_area, area='right')
         
-        self.fill_holes_widget = FillHolesWidget(lambda iterations: self.functions['fill_holes'](self.viewer, iterations))
-        self.viewer.window.add_dock_widget(self.fill_holes_widget, area='right', name='Fill Holes')
-
         # Create a horizontal layout for the color editing buttons
         color_edit_layout = QHBoxLayout()
 
@@ -351,7 +326,7 @@ class VesuviusGUI:
 
     def update_erase_slice_width(self, value):
         self.erase_slice_width = value
-        self.update_global_erase_slice_width(value)
+        self.update_erase_width_callback(value)
         print(f"Erase width updated to: {self.erase_slice_width}")
 
     def setup_napari_defaults(self, main_label_layer_name='Papyrus Labels'):
@@ -509,3 +484,6 @@ class VesuviusGUI:
         - {get_key_string('toggle_show_selected_label')} to toggle show selected label<br>
         """
         return instruction_text
+
+    def morphological_tunnel_fill(self):
+        self.functions['morphological_tunnel_fill'](self.viewer)

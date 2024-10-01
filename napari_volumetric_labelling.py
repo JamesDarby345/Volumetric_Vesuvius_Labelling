@@ -7,7 +7,7 @@ from napari.layers import Image
 from PyQt5.QtCore import QTimer
 from scipy.ndimage import binary_erosion
 from scipy import ndimage
-from qtpy.QtWidgets import QMessageBox
+from qtpy.QtWidgets import QInputDialog, QMessageBox
 from qtpy.QtCore import QTimer
 from napari.qt.threading import thread_worker
 from napari.utils.notifications import show_info
@@ -20,6 +20,7 @@ from data_manager import DataManager
 from config import Config  # Assuming you create a Config class
 import warnings
 import magicgui
+import fastmorph
 
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
@@ -184,44 +185,6 @@ def toggle_show_selected_label(viewer):
     if isinstance(active_layer, napari.layers.Labels):
         active_layer.show_selected_label = not active_layer.show_selected_label
         status = "enabled" if active_layer.show_selected_label else "disabled"
-
-def fill_holes_morphological_closing(viewer, closing_iterations=1):
-    active_layer = viewer.layers.selection.active
-    if not isinstance(active_layer, napari.layers.Labels):
-        show_popup("Please select a label layer.")
-        return
-
-    selected_label = active_layer.selected_label
-    if selected_label == 0:
-        show_popup("Please select a label to fill holes.")
-        return
-    
-    msg = f"Are you sure you want to fill holes in the selected label ({selected_label})? This operation cannot be undone, consider saving first"
-    response = confirm_popup(msg)
-    if response != QMessageBox.Yes:
-        print('filling holes cancelled')
-        return 
-
-    data = active_layer.data.copy()
-    label_mask = data == selected_label
-
-    # Create a structure for 3D connectivity (26-connected)
-    struct = ndimage.generate_binary_structure(3, 3)
-
-    # Perform morphological closing
-    closed_mask = ndimage.binary_closing(label_mask, structure=struct, iterations=closing_iterations)
-
-    # Apply the closed mask back to the data
-    data[closed_mask] = selected_label
-
-    # Update the layer data
-    active_layer.data = data
-    active_layer.refresh()
-
-    # if viewer.dims.ndisplay == 3 and label_3d_name in viewer.layers and viewer.layers[label_3d_name].visible:
-    #     cut_label_at_oblique_plane(viewer, switch=False)
-
-    show_popup("Holes filled successfully.")
 
 def move_seg_mesh_label(viewer, dz=1, dy=0, dx=0, move_all=False):
     if seg_mesh_name not in viewer.layers:
@@ -604,6 +567,66 @@ def dilate_labels(viewer):
         erode_dilate_labels(viewer, viewer.layers[main_label_name].data, erode=False)
     
     viewer.layers[main_label_name].refresh()
+
+def morphological_tunnel_fill(viewer):
+    
+
+    # Prompt user for radius input
+    radius, ok = QInputDialog.getInt(
+        viewer.window._qt_window,
+        "Tunnel Fill",
+        "Enter the radius for tunnel fill:",
+        value=5,
+        min=1,
+        max=1000
+    )
+
+    if not ok:
+        print("Tunnel fill operation cancelled.")
+        return
+    
+    active_layer = viewer.layers.selection.active
+    if not isinstance(active_layer, napari.layers.Labels):
+        show_popup("Please select a label layer.")
+        return
+    
+    label_val = active_layer.selected_label
+    if label_val == 0:
+        show_popup("Please select a non-zero label.")
+        return
+
+    # Confirm operation
+    confirm = QMessageBox.question(
+        viewer.window._qt_window,
+        "Confirm Tunnel Fill",
+        f"Are you sure you want to perform tunnel fill with radius {radius} on the selected label ({label_val})? This operation cannot be undone, consider saving first.",
+        QMessageBox.Yes | QMessageBox.No
+    )
+
+    if confirm == QMessageBox.No:
+        print("Tunnel fill operation cancelled.")
+        return
+
+    
+
+    
+
+    arr = active_layer.data.copy()
+    arr = (arr == label_val).astype(bool)
+    arr = np.pad(arr, pad_width=radius, mode='constant', constant_values=0)
+
+
+    arr = fastmorph.spherical_dilate(arr, radius=radius, parallel=4, in_place=True)
+    arr = fastmorph.spherical_erode(arr, radius=radius, parallel=4, in_place=True)
+
+    arr = arr[radius:-radius, radius:-radius, radius:-radius]
+    arr = np.where(arr > 0, label_val, 0)
+    # Update the active layer data
+    mask = (active_layer.data == 0) & (arr != 0)
+    active_layer.data[mask] = arr[mask]
+    active_layer.refresh()
+    show_popup("Tunnel fill operation completed.")
+    # return arr
 
 def shift_prev_erase_plane(direction):
     global erase_slice_width, prev_erase_plane_info_var
@@ -1347,7 +1370,6 @@ def update_and_reload_data(viewer, data_manager, config, new_z, new_y, new_x, ne
 functions_dict = {
     'erode_labels': erode_labels,
     'dilate_labels': dilate_labels,
-    'fill_holes': fill_holes_morphological_closing,
     'full_label_view': full_label_view,
     'switch_to_plane': switch_to_plane_view,
     'toggle_contextual_view': toggle_contextual_view,
@@ -1358,6 +1380,7 @@ functions_dict = {
     'update_and_reload_data': lambda z, y, x: update_and_reload_data(viewer, data_manager, config, z, y, x),
     'move_seg_mesh_label': lambda viewer, dz, dy, dx, move_all: move_seg_mesh_label(viewer, dz, dy, dx, move_all),
     'reset_segmentation_mesh': reset_segmentation_mesh,
+    'morphological_tunnel_fill': morphological_tunnel_fill,
 }
 
 def update_global_erase_slice_width(value):

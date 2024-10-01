@@ -5,7 +5,7 @@ channels:
 dependencies:
   - python
   # - napari=0.4.19
-  - numpy
+  - numpy<2
   - zarr
   - scikit-image
   - scipy
@@ -15,11 +15,11 @@ dependencies:
   - scikit-learn
   - pyqt
   - numba
-  - pip
   - pip:
     - pynrrd
     - qasync
     - blosc2
+    - fastmorph
     # - napari-threedee 
     # Use patched version of napari-threedee that prevents crash
     - git+https://github.com/JamesDarby345/napari-threedee-undo-bug.git@main
