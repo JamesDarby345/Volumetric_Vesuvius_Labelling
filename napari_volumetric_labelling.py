@@ -20,7 +20,7 @@ from data_manager import DataManager
 from config import Config  # Assuming you create a Config class
 import warnings
 import magicgui
-import fastmorph
+# import fastmorph
 
 
 Base3DRotationCamera.viewbox_mouse_event = patched_viewbox_mouse_event
@@ -607,17 +607,15 @@ def morphological_tunnel_fill(viewer):
         print("Tunnel fill operation cancelled.")
         return
 
-    
-
-    
-
     arr = active_layer.data.copy()
     arr = (arr == label_val).astype(bool)
     arr = np.pad(arr, pad_width=radius, mode='constant', constant_values=0)
 
 
-    arr = fastmorph.spherical_dilate(arr, radius=radius, parallel=4, in_place=True)
-    arr = fastmorph.spherical_erode(arr, radius=radius, parallel=4, in_place=True)
+    # arr = fastmorph.spherical_dilate(arr, radius=radius, parallel=4, in_place=True)
+    arr = numba_dilation_3d_labels(arr, radius)
+    arr = binary_erosion(arr, iterations=radius)
+    # arr = fastmorph.spherical_erode(arr, radius=radius, parallel=4, in_place=True)
 
     arr = arr[radius:-radius, radius:-radius, radius:-radius]
     arr = np.where(arr > 0, label_val, 0)
