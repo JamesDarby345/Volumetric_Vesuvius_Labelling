@@ -12,5 +12,6 @@ numba
 pynrrd
 qasync
 blosc2
+fastmorph
 git+https://github.com/JamesDarby345/napari-threedee-undo-bug.git
 git+https://github.com/JamesDarby345/napari-smoother-labels.git
