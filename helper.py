@@ -15,6 +15,7 @@ from scipy import ndimage
 
 from scipy.spatial import cKDTree
 import os
+import distinctipy
 
 def filter_and_reassign_labels(label_data, cc_min_size):
     """
@@ -436,6 +437,53 @@ def label_foreground_structures_napari(input_array, min_size=1000):
 
     return labeled_array
 
+def generate_light_colormap(N):
+    base_colormap = get_light_slicer_colormap()
+    colors = list(base_colormap.values())
+    if N > 30:
+        generated_colors = distinctipy.get_colors(N - 30, pastel_factor=0.7)
+        colors_255 = [[int(c * 255) for c in generated_color] + [255] for generated_color in generated_colors]
+        colors.extend(colors_255)
+    # colors = distinctipy.get_colors(N, pastel_factor=0.7)
+    print(colors)
+    # colors_255 = [[int(c * 255) for c in color] + [255] for color in colors]
+    # print(colors_255)
+    return {i: color for i, color in enumerate(colors)}
+
+def get_light_slicer_colormap():
+    return {
+        0: [0, 0, 0, 0],
+        1: [128, 174, 128, 255],
+        2: [241, 214, 145, 255],
+        3: [177, 122, 101, 255],
+        4: [111, 184, 210, 255],
+        5: [216, 101, 79, 255],
+        6: [221, 170, 101, 255],
+        7: [144, 238, 144, 255],
+        8: [255, 181, 158, 255],
+        9: [220, 245, 20, 255],
+        10: [78, 63, 0, 255],
+        11: [255, 250, 220, 255],
+        12: [230, 220, 70, 255],
+        13: [200, 200, 235, 255],
+        14: [82, 174, 128, 255],
+        15: [244, 214, 49, 255],
+        16: [0, 151, 206, 255],
+        17: [185, 232, 61, 255],
+        18: [183, 156, 220, 255],
+        19: [183, 214, 211, 255],
+        20: [152, 189, 207, 255],
+        21: [10, 255, 170, 255],
+        22: [178, 212, 242, 255],
+        23: [68, 172, 100, 255],
+        24: [111, 197, 131, 255],
+        25: [85, 188, 255, 255],
+        26: [0, 145, 30, 255],
+        27: [214, 230, 130, 255],
+        28: [0, 147, 202, 255],
+        29: [218, 255, 255, 255],
+        30: [170, 250, 250, 255]
+    }
 def get_slicer_colormap():
     return {
         0: [0, 0, 0, 0],
@@ -632,7 +680,7 @@ def load_or_create_colormap():
         with open(colormap_file, 'r') as file:
             colormap = yaml.safe_load(file)
     else:
-        colormap = get_slicer_colormap()
+        colormap = generate_light_colormap(200)
         with open(colormap_file, 'w') as file:
             yaml.dump(colormap, file)
     

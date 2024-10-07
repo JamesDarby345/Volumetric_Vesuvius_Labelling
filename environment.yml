@@ -20,6 +20,7 @@ dependencies:
     - qasync
     - blosc2
     - fastmorph
+    - distinctipy
     # - napari-threedee 
     # Use patched version of napari-threedee that prevents crash
     - git+https://github.com/JamesDarby345/napari-threedee-undo-bug.git@main
