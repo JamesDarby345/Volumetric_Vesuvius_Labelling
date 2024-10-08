@@ -1,5 +1,5 @@
 #napari[all]==0.4.19
-numpy
+numpy<2
 zarr
 scikit-image
 scipy
