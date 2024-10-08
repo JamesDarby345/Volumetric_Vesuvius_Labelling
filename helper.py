@@ -484,6 +484,7 @@ def get_light_slicer_colormap():
         29: [218, 255, 255, 255],
         30: [170, 250, 250, 255]
     }
+
 def get_slicer_colormap():
     return {
         0: [0, 0, 0, 0],
