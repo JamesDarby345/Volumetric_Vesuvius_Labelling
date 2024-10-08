@@ -607,10 +607,6 @@ def morphological_tunnel_fill(viewer):
         print("Tunnel fill operation cancelled.")
         return
 
-    
-
-    
-
     arr = active_layer.data.copy()
     arr = (arr == label_val).astype(bool)
     arr = np.pad(arr, pad_width=radius, mode='constant', constant_values=0)
