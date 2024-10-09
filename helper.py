@@ -445,7 +445,7 @@ def generate_light_colormap(N):
         colors_255 = [[int(c * 255) for c in generated_color] + [255] for generated_color in generated_colors]
         colors.extend(colors_255)
     # colors = distinctipy.get_colors(N, pastel_factor=0.7)
-    print(colors)
+    # print(colors)
     # colors_255 = [[int(c * 255) for c in color] + [255] for color in colors]
     # print(colors_255)
     return {i: color for i, color in enumerate(colors)}

@@ -57,6 +57,7 @@ if config.cube_config.align_coordinates and not is_valid_coord([z_num, y_num, x_
     x = str(x_num).zfill(5)
     config.cube_config.update_coordinates(z=z, y=y, x=x)
 
+print('Creating DataManager')
 data_manager = DataManager(config.cube_config)
 
 # Data location and size parameters
@@ -80,6 +81,7 @@ ink_pred_data = data_manager.original_ink_pred_data
 voxelized_segmentation_mesh_data = data_manager.voxelized_segmentation_mesh_data
 
 # Initialize the Napari viewer
+print('Initializing Napari Viewer')
 viewer = napari.Viewer()
 
 #layer name variables
