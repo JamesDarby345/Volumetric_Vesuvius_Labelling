@@ -20,7 +20,7 @@ dependencies:
     - pynrrd
     - qasync
     - blosc2
-    - fastmorph
+    # - fastmorph
     - distinctipy
     # - napari-threedee 
     # Use patched version of napari-threedee that prevents crash
