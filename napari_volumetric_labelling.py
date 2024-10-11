@@ -118,19 +118,6 @@ if voxelized_segmentation_mesh_data is not None:
     offset = np.array([config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount, config.cube_config.voxelized_mesh_pad_amount])
     seg_mesh_layer.translate = -offset
     seg_mesh_layer.opacity = 1
-
-@magicgui.magicgui(auto_call=False, on={"visible": False})
-def toggle_smooth_labels(viewer: napari.viewer.Viewer, layer: napari.layers.Labels, on=False):
-    if viewer.dims.ndisplay != 3:
-        return
-    try:
-        print("Toggling smooth labels for layer:", layer.name)
-        node = viewer.window.qt_viewer.layer_to_visual[layer].node
-        node.iso_gradient = not node.iso_gradient
-        if on:
-            node.iso_gradient = True
-    except Exception as e:
-        print("Error toggling smooth labels:", e)
     
 
 # Functions:
@@ -1384,6 +1371,15 @@ def update_global_erase_slice_width(value):
     erase_slice_width = value
     print(f"Global erase width updated to: {erase_slice_width}")
 
+def toggle_smooth_labels(viewer, layer, on=False):
+    if hasattr(layer, 'iso_gradient_mode'):
+        if on:
+            layer.iso_gradient_mode = 'smooth'
+        else:
+            layer.iso_gradient_mode = 'fast'
+    else:
+        print(f"Warning: Layer {layer.name} does not support smooth labels rendering.")
+
 # Create the GUI
 seg_mesh_exists = seg_mesh_name in viewer.layers # Check if the segmentation mesh layer exists
 gui = VesuviusGUI(viewer, functions_dict, update_global_erase_slice_width, config, config.cube_config.main_label_layer_name, seg_mesh_exists)
@@ -1421,7 +1417,6 @@ if config.cube_config.smoother_labels:
     if "Original Semantic Mask" in viewer.layers:
         toggle_smooth_labels(viewer, viewer.layers["Original Semantic Mask"], on=True)
 
-viewer.window.add_dock_widget(toggle_smooth_labels)
 
 # Start the Napari event loop
 napari.run()

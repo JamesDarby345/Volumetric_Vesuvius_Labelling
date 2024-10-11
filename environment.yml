@@ -3,17 +3,15 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python
-  # - napari=0.4.19
+  - python=3.12
+  - napari
+  - pyqt
   - numpy<2
   - zarr
   - scikit-image
   - scipy
   - matplotlib
-  - jupyter
-  - ipykernel
   - scikit-learn
-  - pyqt
   - numba
   - pip
   - pip:
@@ -25,5 +23,3 @@ dependencies:
     # - napari-threedee 
     # Use patched version of napari-threedee that prevents crash
     - git+https://github.com/JamesDarby345/napari-threedee-undo-bug.git@main
-    # use smoother labels fork for napari for now
-    - git+https://github.com/JamesDarby345/napari-smoother-labels.git@main
